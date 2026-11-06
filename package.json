@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --project unit",
+    "test:e2e": "firebase emulators:exec --only auth,firestore,storage --project demo-organicin \"npm run seed -- --force && npm run admin -- add admin@example.com && npx playwright test\"",
     "test:emulator": "firebase emulators:exec --only auth,firestore,storage --project demo-organicin 'vitest run --project emulator'",
     "emulators": "firebase emulators:start --project demo-organicin --import=./.emulator-data --export-on-exit",
     "admin": "tsx scripts/admin.ts",

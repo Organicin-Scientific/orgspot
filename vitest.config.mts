@@ -1,9 +1,11 @@
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
+const root = import.meta.dirname;
+
 const alias = {
-  '@': path.resolve(__dirname, 'src'),
-  'server-only': path.resolve(__dirname, 'tests/stubs/server-only.ts'),
+  '@': path.resolve(root, 'src'),
+  'server-only': path.resolve(root, 'tests/stubs/server-only.ts'),
 };
 
 export default defineConfig({
