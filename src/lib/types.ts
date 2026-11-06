@@ -31,8 +31,7 @@ export const RECIPIENT_STATUSES = [
 ] as const;
 export type RecipientStatus = (typeof RECIPIENT_STATUSES)[number];
 
-/** Stored on `suppressionList` docs. `hard_bounce` is legacy (use `bounce`). */
-export const SUPPRESSION_REASONS = ["unsubscribe", "bounce", "hard_bounce", "complaint", "manual"] as const;
+export const SUPPRESSION_REASONS = ["unsubscribe", "bounce", "complaint", "manual"] as const;
 export type SuppressionReason = (typeof SUPPRESSION_REASONS)[number];
 
 export const PDF_DELIVERY = ["attach", "link", "none"] as const;

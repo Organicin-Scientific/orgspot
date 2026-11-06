@@ -13,7 +13,6 @@ export function statusForReason(reason: SuppressionReason): InvestorStatus {
     case "unsubscribe":
       return "unsubscribed";
     case "bounce":
-    case "hard_bounce":
       return "bounced";
     default:
       return "suppressed";
