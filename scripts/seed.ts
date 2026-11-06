@@ -212,7 +212,7 @@ function buildInvestorSpecs(): InvestorSpec[] {
 
 async function deleteCollection(db: Firestore, name: string): Promise<void> {
   const ref = db.collection(name);
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const snap = await ref.limit(BATCH_LIMIT).get();
     if (snap.empty) break;
