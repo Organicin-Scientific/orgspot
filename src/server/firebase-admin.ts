@@ -6,7 +6,10 @@ import { getStorage } from "firebase-admin/storage";
 import { env } from "./env";
 
 let app: App | null = null;
-let firestore: Firestore | null = null;
+
+// firebase-admin is shared process-wide, but this module can be evaluated more than once
+// (separate route bundles, dev reloads). Firestore settings may only be applied once.
+const shared = globalThis as typeof globalThis & { __adminFirestore?: Firestore };
 
 function adminApp(): App {
   if (app) return app;
@@ -34,9 +37,10 @@ function adminApp(): App {
 }
 
 export function db(): Firestore {
-  if (firestore) return firestore;
-  firestore = getFirestore(adminApp());
+  if (shared.__adminFirestore) return shared.__adminFirestore;
+  const firestore = getFirestore(adminApp());
   firestore.settings({ ignoreUndefinedProperties: true });
+  shared.__adminFirestore = firestore;
   return firestore;
 }
 
