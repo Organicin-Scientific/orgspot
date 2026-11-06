@@ -27,7 +27,6 @@ function reasonLabel(raw: string): string {
   switch (raw) {
     case "unsubscribe":
       return "Unsubscribed";
-    case "hard_bounce":
     case "bounce":
       return "Hard bounce";
     case "complaint":
