@@ -34,6 +34,10 @@ export default defineConfig({
             'tests/rules/**/*.test.ts',
             'tests/integration/**/*.test.ts',
           ],
+          setupFiles: [
+            'tests/integration/setup-env.ts',
+            'tests/integration/setup.ts',
+          ],
           environment: 'node',
           testTimeout: 30000,
           hookTimeout: 30000,
