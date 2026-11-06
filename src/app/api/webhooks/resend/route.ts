@@ -23,10 +23,16 @@ export async function POST(req: NextRequest) {
   };
   let payload: unknown;
   try {
-    payload = new Webhook(secret).verify(raw, headers);
+    // Some svix versions return undefined from verify(), so the verified body is parsed separately.
+    new Webhook(secret).verify(raw, headers);
   } catch {
     log.warn("webhook.signature_invalid");
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  }
+  try {
+    payload = JSON.parse(raw) as unknown;
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
   const event = normalizeResendEvent(headers["svix-id"], payload);
