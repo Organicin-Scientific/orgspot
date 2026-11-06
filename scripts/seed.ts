@@ -337,7 +337,7 @@ async function run(): Promise<void> {
     } else if (spec.status === "bounced") {
       await setDoc(db.collection("suppressionList").doc(emailNormalized), {
         email: spec.email,
-        reason: "hard_bounce",
+        reason: "bounce",
         source: "seed",
         createdAt: ts,
       });

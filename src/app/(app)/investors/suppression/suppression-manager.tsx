@@ -34,8 +34,6 @@ function reasonLabel(raw: string): string {
       return "Spam complaint";
     case "manual":
       return "Added manually";
-    case "provider":
-      return "Provider suppression";
     default:
       return raw.replace(/_/g, " ");
   }
