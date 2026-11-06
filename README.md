@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Organicin Investor Updates
 
-## Getting Started
+Internal admin app for **Organicin Scientific** investor communications: maintain investor contacts and groups, manage a global suppression list, compose document-style updates in a Tiptap editor, preview them (desktop, mobile, PDF, plain text), run limited test sends, and after review submit an explicit **Confirm and send** that queues a durable Firestore job. A worker (cron + post-approval) sends email through **Resend** when `liveSending` is true; **Resend webhooks** drive delivery and engagement into **Firestore**. Analytics and archives surface campaign history, per-recipient status, and engagement.
 
-First, run the development server:
+## Tech stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+| Area | Choices |
+|------|---------|
+| Framework | Next.js (App Router), React 19, TypeScript |
+| Auth | Firebase Auth (Google + TOTP MFA in production), HTTP-only session cookie |
+| Data | Cloud Firestore (server-only access via Admin SDK), Firebase Storage for assets and campaign snapshots |
+| Email | Resend (live sends), React Email, sandbox provider locally/preview |
+| Rich content | Tiptap, Zod-validated content schema |
+| PDF | `@react-pdf/renderer` |
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Further reading: [Deployment](docs/deployment.md), [Security](docs/security.md), [Data model](docs/data-model.md), [Backup & recovery](docs/backup-recovery.md), [Email testing](docs/email-testing.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local development (Firebase emulators)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prerequisites: Node.js, `npm`, **Java** (for the emulators), and `firebase-tools` (installed as a dev dependency).
 
-## Learn More
+1. Install dependencies:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Copy environment template and edit as needed:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   cp .env.example .env.local
+   ```
 
-## Deploy on Vercel
+3. Start emulators (imports `./.emulator-data` on start, exports on exit):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```bash
+   npm run emulators
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. Seed synthetic data (intended for the emulator only):
+
+   ```bash
+   npm run seed
+   ```
+
+   The seed creates an allowlisted admin `dev@example.com` (among other data).
+
+5. Start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+6. Open the app and sign in.
+
+   - **Google + MFA path:** use the normal login flow when not using emulator-only shortcuts.
+   - **Emulator dev login:** set `NEXT_PUBLIC_AUTH_EMULATOR_LOGIN=true` and ensure `FIREBASE_AUTH_EMULATOR_HOST` (and related emulator vars) match `.env.example`. The login page shows **Local emulator sign-in** only in that configuration.  
+   - The dev-login API (`POST /api/auth/dev-login`) only works when the Auth emulator is configured, the environment is not production, and MFA is not required (`AUTH_REQUIRE_MFA` must be false). It checks the email against the Firestore **admins** allowlist (`getAdmin` with a fresh read); if the user is not on the list, sign-in is forbidden. It mints a session for an existing or newly created Auth user with that email.
+
+## npm scripts
+
+| Script | Purpose |
+|--------|---------|
+| `dev` | Next.js development server |
+| `build` | Production build |
+| `start` | Run production server |
+| `lint` | ESLint |
+| `test` | Unit tests (Vitest, `unit` project) |
+| `test:emulator` | Run tests against emulators (`firebase emulators:exec`) |
+| `emulators` | Start Auth, Firestore, Storage emulators with import/export |
+| `admin` | CLI for Firestore `admins` (`tsx scripts/admin.ts`) |
+| `seed` | Seed emulator data (`tsx scripts/seed.ts`) |
+| `typecheck` | `tsc --noEmit` |
+
+## Project structure (overview)
+
+| Path | Role |
+|------|------|
+| `src/app/(app)/` | Authenticated app routes (dashboard, investors, updates, send flow, analytics, settings) |
+| `src/app/login/` | Login UI and emulator dev sign-in |
+| `src/app/api/` | Route handlers (auth, CRUD, campaigns, webhooks, internal worker, assets, previews) |
+| `src/server/` | Firebase Admin, env, HTTP helpers (`withAdmin`), campaigns worker, email, storage, audit, rate limits |
+| `src/lib/` | Shared types, content schema, import/export helpers, delivery logic |
+| `src/components/` | UI components |
+| `src/emails/` | React Email templates |
+
+Firebase security rules deny direct client access to Firestore and Storage; the app uses server routes with the Admin SDK.
+
+## Documentation index
+
+- [docs/deployment.md](docs/deployment.md) — Vercel, Firebase production, Resend, cron, environment variables  
+- [docs/security.md](docs/security.md) — Threat model and controls  
+- [docs/data-model.md](docs/data-model.md) — Firestore collections and Storage paths  
+- [docs/backup-recovery.md](docs/backup-recovery.md) — Backups, recovery, interrupted sends  
+- [docs/email-testing.md](docs/email-testing.md) — Safe testing, sandbox, webhooks  
