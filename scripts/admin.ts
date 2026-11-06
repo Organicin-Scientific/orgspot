@@ -47,6 +47,11 @@ function initFirebase(): void {
   const rawKey = process.env.FIREBASE_PRIVATE_KEY;
   const privateKey = rawKey?.replace(/\\n/g, "\n");
 
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    initializeApp({ projectId });
+    return;
+  }
+
   if (clientEmail && privateKey) {
     initializeApp({
       credential: cert({

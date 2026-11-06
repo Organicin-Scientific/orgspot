@@ -5,7 +5,7 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { getApps, initializeApp, cert, applicationDefault } from "firebase-admin/app";
+import { getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, type DocumentReference, type Firestore } from "firebase-admin/firestore";
 
 const envLocalPath = resolve(process.cwd(), ".env.local");
@@ -106,26 +106,8 @@ function initFirebase(): void {
     );
   }
 
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
-  const privateKey = rawKey?.replace(/\\n/g, "\n");
-
-  if (clientEmail && privateKey) {
-    initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-      projectId,
-    });
-    return;
-  }
-
-  initializeApp({
-    credential: applicationDefault(),
-    projectId,
-  });
+  // The emulator accepts unauthenticated admin requests; no credential is needed.
+  initializeApp({ projectId });
 }
 
 function words(s: string): string[] {
