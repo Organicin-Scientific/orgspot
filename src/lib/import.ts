@@ -42,6 +42,7 @@ export function suggestMapping(headers: string[]): ColumnMapping {
     const idx = headers.findIndex((h, i) => !used.has(i) && clean(h).includes("email"));
     if (idx >= 0) mapping.email = idx;
   }
+  // A "name" column maps to fullName, but explicit first/last columns must win — mixing breaks preview/commit.
   if (mapping.firstName !== undefined || mapping.lastName !== undefined) delete mapping.fullName;
   return mapping;
 }

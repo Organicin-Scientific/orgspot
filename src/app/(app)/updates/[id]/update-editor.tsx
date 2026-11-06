@@ -362,7 +362,12 @@ function SaveIndicator({ state, savedAt, editable }: { state: SaveState; savedAt
       </>
     );
   return (
-    <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex" aria-live="polite">
+    <span
+      data-testid="update-save-indicator"
+      data-save-state={state}
+      className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex"
+      aria-live="polite"
+    >
       {content}
     </span>
   );

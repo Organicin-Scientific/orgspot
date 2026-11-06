@@ -91,12 +91,38 @@ export function ImportWizard({ groups }: { groups: InvestorGroup[] }) {
     }
   }
 
+  function serializableRows(rows: string[][], width: number) {
+    return rows.map((r) => Array.from({ length: width }, (_, i) => String(r[i] ?? "")));
+  }
+
+  function rowWidth(rows: string[][], m: ColumnMapping, headerCount: number): number {
+    let w = headerCount;
+    for (const r of rows) w = Math.max(w, r.length);
+    for (const v of Object.values(m)) {
+      if (typeof v === "number" && !Number.isNaN(v)) w = Math.max(w, v + 1);
+    }
+    return w;
+  }
+
+  function serializableMapping(m: ColumnMapping): ColumnMapping {
+    const out: ColumnMapping = {};
+    for (const [k, v] of Object.entries(m) as [ImportField, number | undefined][]) {
+      if (typeof v === "number" && !Number.isNaN(v)) out[k] = v;
+    }
+    return out;
+  }
+
   async function runPreview() {
     if (!parsed) return;
     setBusy(true);
     setError(null);
     try {
-      setPreview(await api<Preview>("/api/investors/import/preview", { body: { rows: parsed.rows, mapping } }));
+      const width = rowWidth(parsed.rows, mapping, parsed.headers.length);
+      setPreview(
+        await api<Preview>("/api/investors/import/preview", {
+          body: { rows: serializableRows(parsed.rows, width), mapping: serializableMapping(mapping) },
+        }),
+      );
       setStep(2);
     } catch (err) {
       setError(errorMessage(err));
@@ -110,8 +136,15 @@ export function ImportWizard({ groups }: { groups: InvestorGroup[] }) {
     setBusy(true);
     setError(null);
     try {
+      const width = rowWidth(parsed.rows, mapping, parsed.headers.length);
       const res = await api<ImportSummary>("/api/investors/import/commit", {
-        body: { rows: parsed.rows, mapping, duplicateStrategy: strategy, groupIds, confirm: true },
+        body: {
+          rows: serializableRows(parsed.rows, width),
+          mapping: serializableMapping(mapping),
+          duplicateStrategy: strategy,
+          groupIds,
+          confirm: true,
+        },
       });
       setSummary(res);
       setStep(3);
@@ -204,12 +237,12 @@ export function ImportWizard({ groups }: { groups: InvestorGroup[] }) {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-3 sm:grid-cols-3">
-                <Stat label="Contacts added" value={summary.created} />
-                <Stat label="Existing contacts updated" value={summary.updated} />
-                <Stat label="Existing contacts unchanged" value={summary.skippedExisting} />
-                <Stat label="Invalid rows skipped" value={summary.invalid} muted />
-                <Stat label="Duplicate rows in file" value={summary.duplicateInFile} muted />
-                <Stat label="Added as suppressed" value={summary.suppressedOnImport} muted />
+                <Stat testId="import-summary-contacts-added" label="Contacts added" value={summary.created} />
+                <Stat testId="import-summary-existing-updated" label="Existing contacts updated" value={summary.updated} />
+                <Stat testId="import-summary-existing-unchanged" label="Existing contacts unchanged" value={summary.skippedExisting} />
+                <Stat testId="import-summary-invalid-skipped" label="Invalid rows skipped" value={summary.invalid} muted />
+                <Stat testId="import-summary-duplicates-in-file" label="Duplicate rows in file" value={summary.duplicateInFile} muted />
+                <Stat testId="import-summary-suppressed" label="Added as suppressed" value={summary.suppressedOnImport} muted />
               </div>
               <div className="flex gap-2">
                 <Button asChild>
@@ -393,10 +426,10 @@ function ReviewStep({
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="New contacts" value={counts.new} />
-        <Stat label="Already in directory" value={counts.existing} />
-        <Stat label="Invalid rows" value={counts.invalid} muted />
-        <Stat label="Duplicates in file" value={counts.duplicateInFile} muted />
+        <Stat testId="import-review-new-contacts" label="New contacts" value={counts.new} />
+        <Stat testId="import-review-already-in-directory" label="Already in directory" value={counts.existing} />
+        <Stat testId="import-review-invalid-rows" label="Invalid rows" value={counts.invalid} muted />
+        <Stat testId="import-review-duplicates-in-file" label="Duplicates in file" value={counts.duplicateInFile} muted />
       </div>
       {counts.suppressed > 0 && (
         <Alert>
@@ -521,9 +554,9 @@ const OUTCOME_LABEL: Record<PreviewRow["outcome"], string> = {
   duplicate_in_file: "Duplicate",
 };
 
-function Stat({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
+function Stat({ testId, label, value, muted }: { testId: string; label: string; value: number; muted?: boolean }) {
   return (
-    <div className="rounded-xl border p-4">
+    <div className="rounded-xl border p-4" data-testid={testId}>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={cn("mt-1 text-2xl font-semibold tabular-nums", muted && value > 0 && "text-muted-foreground")}>{formatNumber(value)}</div>
     </div>

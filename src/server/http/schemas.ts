@@ -61,11 +61,33 @@ export const groupPatch = groupInput.partial();
 export const suppressionInput = z.object({ email, reason: z.literal("manual").default("manual") });
 export const suppressionRemove = z.object({ email, confirm: z.literal(true) });
 
-const mapping = z.record(z.enum(IMPORT_FIELDS), z.number().int().min(0).max(49)).refine(
-  (m) => m.email !== undefined,
-  "Map a column to Email address",
-);
-const importRows = z.array(z.array(z.string().max(5000)).max(50)).max(MAX_IMPORT_ROWS);
+const columnIndex = z.number().int().min(0).max(49);
+
+/** Drop invalid entries; use explicit keys so missing fields are optional (z.record rejects undefined). */
+const mapping = z.preprocess((val: unknown) => {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return val;
+  const src = val as Record<string, unknown>;
+  const out: Partial<Record<(typeof IMPORT_FIELDS)[number], number>> = {};
+  for (const field of IMPORT_FIELDS) {
+    const v = src[field];
+    if (v === undefined || v === null || v === "") continue;
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(n)) out[field] = n;
+  }
+  return out;
+}, z
+  .object({
+    email: columnIndex.optional(),
+    firstName: columnIndex.optional(),
+    lastName: columnIndex.optional(),
+    fullName: columnIndex.optional(),
+    organization: columnIndex.optional(),
+    category: columnIndex.optional(),
+    notes: columnIndex.optional(),
+  })
+  .refine((m) => m.email !== undefined, "Map a column to Email address"));
+/** Sparse rows / null cells after JSON parse must not fail validation. */
+const importRows = z.array(z.array(z.coerce.string().max(5000)).max(50)).max(MAX_IMPORT_ROWS);
 
 export const importPreviewInput = z.object({ rows: importRows, mapping });
 export const importCommitInput = z.object({
