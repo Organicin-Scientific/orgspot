@@ -9,7 +9,7 @@ import { z } from "zod";
 export const BRAND_TEXT_COLORS = [
   "#111827",
   "#4b5563",
-  "#1f6f5c",
+  "#157a6e",
   "#174f73",
   "#9a3412",
   "#b91c1c",

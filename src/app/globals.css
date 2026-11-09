@@ -219,11 +219,13 @@
  * brand's text colour, regardless of the app theme.
  */
 .doc-page {
-  --doc-brand: #1f6f5c;
+  --doc-brand: #157a6e;
+  --doc-accent: #f2b772;
   --doc-text: #1a1a1a;
+  --doc-font: var(--font-nunito-sans), "Nunito Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   background: #ffffff;
   color: var(--doc-text);
-  font-family: Helvetica, Arial, sans-serif;
+  font-family: var(--doc-font);
   font-size: 15px;
   line-height: 1.6;
   color-scheme: light;
@@ -257,9 +259,28 @@
   color: var(--doc-brand);
   text-decoration: underline;
 }
+/* Leaf bullets (brand mark from the wordmark's G); ordered lists keep numbers. */
 .doc-page ul {
-  list-style: disc;
+  list-style: none;
   padding-left: 1.5em;
+}
+.doc-page ul > li {
+  position: relative;
+}
+.doc-page ul > li::before {
+  content: "";
+  position: absolute;
+  left: -1.35em;
+  top: 0.48em;
+  width: 0.72em;
+  height: 0.72em;
+  background: url("/brand/leaf-bullet.svg") no-repeat center / contain;
+}
+.doc-page .doc-header-rule {
+  width: 48px;
+  height: 0;
+  margin: 14px auto 0;
+  border-top: 2px solid var(--doc-accent);
 }
 .doc-page ol {
   list-style: decimal;

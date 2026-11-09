@@ -1,24 +1,70 @@
 import "server-only";
+import path from "node:path";
 import * as React from "react";
-import { Document, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Font, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { BRAND_GOLD } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
 import type { AppSettings } from "@/lib/types";
 import { loadAssetBuffers } from "../storage";
-import { DEFAULT_LOGO_PNG } from "./default-logo";
+import { DEFAULT_LEAF_PNG, DEFAULT_LOGO_PNG } from "./default-logo";
 
 type ImageMap = Map<string, { buf: Buffer; mime: string }>;
+
+interface Faces {
+  regular: string;
+  bold: string;
+  italic: string;
+  boldItalic: string;
+  black: string;
+}
 
 interface Ctx {
   color: string;
   text: string;
   images: ImageMap;
+  f: Faces;
+}
+
+const HELVETICA: Faces = {
+  regular: "Helvetica",
+  bold: "Helvetica-Bold",
+  italic: "Helvetica-Oblique",
+  boldItalic: "Helvetica-BoldOblique",
+  black: "Helvetica-Bold",
+};
+
+/**
+ * Nunito Sans, the brand typeface, read from src/fonts. next.config.ts ships that folder to the
+ * API functions through outputFileTracingIncludes. Registered once per process.
+ */
+const NUNITO: Faces = {
+  regular: "NunitoSans",
+  bold: "NunitoSans-Bold",
+  italic: "NunitoSans-Italic",
+  boldItalic: "NunitoSans-BoldItalic",
+  black: "NunitoSans-Black",
+};
+let nunitoRegistered = false;
+function registerNunito() {
+  if (nunitoRegistered) return;
+  const dir = path.join(process.cwd(), "src", "fonts");
+  const files: [string, string][] = [
+    [NUNITO.regular, "nunito-sans-latin-400-normal.woff"],
+    [NUNITO.bold, "nunito-sans-latin-700-normal.woff"],
+    [NUNITO.italic, "nunito-sans-latin-400-italic.woff"],
+    [NUNITO.boldItalic, "nunito-sans-latin-700-italic.woff"],
+    [NUNITO.black, "nunito-sans-latin-900-normal.woff"],
+  ];
+  for (const [family, file] of files) Font.register({ family, src: path.join(dir, file) });
+  Font.registerHyphenationCallback((word) => [word]);
+  nunitoRegistered = true;
 }
 
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
 
 const s = StyleSheet.create({
-  page: { paddingTop: 48, paddingBottom: 64, paddingHorizontal: 56, fontFamily: "Helvetica", fontSize: 10.5, lineHeight: 1.55 },
+  page: { paddingTop: 48, paddingBottom: 64, paddingHorizontal: 56, fontSize: 10.5, lineHeight: 1.55 },
   para: { marginBottom: 8 },
   footer: { position: "absolute", bottom: 28, left: 56, right: 56, fontSize: 8, color: MUTED, textAlign: "center" },
 });
@@ -43,7 +89,7 @@ function Inline({ nodes, ctx }: { nodes?: InlineNode[]; ctx: Ctx }) {
         const bold = marks.some((m) => m.type === "bold");
         const italic = marks.some((m) => m.type === "italic");
         const style = {
-          fontFamily: bold && italic ? "Helvetica-BoldOblique" : bold ? "Helvetica-Bold" : italic ? "Helvetica-Oblique" : "Helvetica",
+          fontFamily: bold && italic ? ctx.f.boldItalic : bold ? ctx.f.bold : italic ? ctx.f.italic : ctx.f.regular,
           textDecoration: marks.some((m) => m.type === "underline")
             ? ("underline" as const)
             : marks.some((m) => m.type === "strike")
@@ -82,7 +128,7 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
       return (
         <Text
           style={{
-            fontFamily: "Helvetica-Bold",
+            fontFamily: ctx.f.bold,
             fontSize: size,
             marginTop: node.attrs.level === 1 ? 4 : 12,
             marginBottom: 6,
@@ -90,14 +136,14 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
             textAlign: node.attrs.textAlign ?? "left",
           }}
         >
-          <Inline nodes={node.content} ctx={ctx} />
+          <Inline nodes={node.content} ctx={{ ...ctx, f: { ...ctx.f, regular: ctx.f.bold, italic: ctx.f.boldItalic } }} />
         </Text>
       );
     }
     case "pullQuote":
       return (
-        <Text style={{ ...s.para, fontFamily: "Helvetica-Oblique", color: ctx.text }}>
-          <Inline nodes={node.content} ctx={ctx} />
+        <Text style={{ ...s.para, fontFamily: ctx.f.italic, fontSize: 12.5, textAlign: "center", color: ctx.color, paddingHorizontal: 18, marginBottom: 12 }}>
+          <Inline nodes={node.content} ctx={{ ...ctx, f: { ...ctx.f, regular: ctx.f.italic, bold: ctx.f.boldItalic } }} />
         </Text>
       );
     case "bulletList":
@@ -107,7 +153,14 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
         <View style={{ marginBottom: 8 }}>
           {node.content.map((li, i) => (
             <View key={i} style={{ flexDirection: "row", marginBottom: 4 }} wrap={false}>
-              <Text style={{ width: 18, color: ctx.text }}>{node.type === "orderedList" ? `${start + i}.` : "•"}</Text>
+              {node.type === "orderedList" ? (
+                <Text style={{ width: 18, color: ctx.text }}>{`${start + i}.`}</Text>
+              ) : (
+                <View style={{ width: 16, paddingTop: 4.2 }}>
+                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                  <Image src={{ data: DEFAULT_LEAF_PNG, format: "png" }} style={{ width: 7.5, height: 7.5 }} />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 {li.content.map((c, j) => (
                   <Block key={j} node={c} ctx={ctx} tight />
@@ -137,18 +190,22 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
           ))}
         </View>
       );
-    case "metrics":
+    case "metrics": {
+      const anySublabel = node.attrs.items.some((m) => m.sublabel);
       return (
         <View style={{ flexDirection: "row", marginTop: 4, marginBottom: 14 }} wrap={false}>
           {node.attrs.items.map((m, i) => (
             <View key={i} style={{ flex: 1, alignItems: "center", paddingHorizontal: 4 }}>
-              <Text style={{ fontSize: 9.5, color: ctx.text, textAlign: "center" }}>{m.label}</Text>
-              {m.sublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center" }}>{m.sublabel}</Text> : null}
-              <Text style={{ fontSize: 15, fontFamily: "Helvetica-Bold", color: ctx.color, marginTop: 4 }}>{m.value}</Text>
+              <Text style={{ fontSize: 8, fontFamily: ctx.f.black, letterSpacing: 0.6, color: ctx.text, textAlign: "center" }}>
+                {m.label.toUpperCase()}
+              </Text>
+              {anySublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center" }}>{m.sublabel || " "}</Text> : null}
+              <Text style={{ fontSize: 15, fontFamily: ctx.f.bold, color: ctx.color, marginTop: 4 }}>{m.value}</Text>
             </View>
           ))}
         </View>
       );
+    }
     case "image": {
       const src = pdfImage(ctx.images, node.attrs.assetId);
       if (!src) {
@@ -230,21 +287,24 @@ function collectIds(input: PdfInput): string[] {
 export async function renderUpdatePdf(input: PdfInput): Promise<Buffer> {
   const images = await loadAssetBuffers(collectIds(input));
   const b = input.settings.branding;
-  const ctx: Ctx = { color: b.primaryColor, text: b.textColor, images };
+  const f = b.fontFamily === "nunito" ? NUNITO : HELVETICA;
+  if (f === NUNITO) registerNunito();
+  const ctx: Ctx = { color: b.primaryColor, text: b.textColor, images, f };
   const logo = b.logoAssetId ? pdfImage(images, b.logoAssetId) : { data: DEFAULT_LOGO_PNG, format: "png" as const };
   const banner = pdfImage(images, input.bannerAssetId);
   const doc = (
     <Document title={input.title} author={b.companyName} creator={b.companyName} producer={b.companyName}>
-      <Page size="LETTER" style={s.page}>
+      <Page size="LETTER" style={{ ...s.page, fontFamily: f.regular }}>
         <View style={{ alignItems: "center", marginBottom: 14 }}>
           {logo ? (
             // eslint-disable-next-line jsx-a11y/alt-text
             <Image src={logo} style={{ width: 200 }} />
           ) : (
-            <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 20, letterSpacing: 1, color: b.primaryColor }}>
+            <Text style={{ fontFamily: f.black, fontSize: 20, letterSpacing: 1, color: b.primaryColor }}>
               {b.companyName.toUpperCase()}
             </Text>
           )}
+          <View style={{ width: 36, borderTopWidth: 1.5, borderTopColor: BRAND_GOLD, marginTop: 10 }} />
           <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 6 }}>{input.dateLabel}</Text>
         </View>
         {banner ? (

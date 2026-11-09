@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   poweredByHeader: false,
   serverExternalPackages: ["firebase-admin", "@react-pdf/renderer", "exceljs"],
+  // The PDF renderer reads Nunito Sans from disk at runtime.
+  outputFileTracingIncludes: { "/api/**": ["./src/fonts/**/*"] },
   turbopack: {
     rules: {
       "*.css": {

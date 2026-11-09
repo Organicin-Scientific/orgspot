@@ -4,17 +4,19 @@ import type { AppSettings } from "@/lib/types";
 import { env } from "../env";
 import { db } from "../firebase-admin";
 import { storageProblem } from "../storage";
+import { BRAND_GREEN } from "@/lib/brand";
 import { iso, str } from "./convert";
 
-export const DEFAULT_BRAND_COLOR = "#1f6f5c";
+export { fontStack, FONT_STACKS, type FontKey } from "@/lib/brand";
 
-export const FONT_STACKS = {
-  helvetica: "Helvetica, Arial, sans-serif",
-  georgia: "Georgia, 'Times New Roman', serif",
-  verdana: "Verdana, Geneva, sans-serif",
-  trebuchet: "'Trebuchet MS', Helvetica, sans-serif",
-} as const;
-export type FontKey = keyof typeof FONT_STACKS;
+/** Organicin brand green (OS-02 Brand Guide). */
+export const DEFAULT_BRAND_COLOR = BRAND_GREEN;
+/** The footer prefixes the company name, so the address starts at the street. */
+export const DEFAULT_POSTAL_ADDRESS = "240 Thatcher Rd, Amherst, MA 01003, United States";
+
+/** Defaults shipped before the brand pass. Stored values equal to these are read as the new defaults. */
+const LEGACY_BRAND_COLOR = "#1f6f5c";
+const LEGACY_FONT = "helvetica";
 
 export function defaultSettings(): AppSettings {
   const sender = process.env.SENDER_EMAIL ?? "";
@@ -24,10 +26,10 @@ export function defaultSettings(): AppSettings {
       logoAssetId: null,
       primaryColor: DEFAULT_BRAND_COLOR,
       textColor: "#1f2937",
-      fontFamily: "helvetica",
+      fontFamily: "nunito",
     },
     sender: { fromName: "Organicin Scientific", fromEmail: sender, replyTo: "" },
-    postalAddress: "",
+    postalAddress: DEFAULT_POSTAL_ADDRESS,
     footerNote: "You are receiving this email because you are an investor in, or advisor to, Organicin Scientific.",
     updatedAt: null,
     updatedBy: null,
@@ -43,20 +45,22 @@ export async function getSettings(): Promise<AppSettings> {
   const d = snap.data() ?? {};
   const b = (d.branding ?? {}) as Partial<AppSettings["branding"]>;
   const s = (d.sender ?? {}) as Partial<AppSettings["sender"]>;
+  // Branding never changed from the old defaults picks up the brand guide's color and type.
+  const untouched = (b.primaryColor ?? LEGACY_BRAND_COLOR).toLowerCase() === LEGACY_BRAND_COLOR && (b.fontFamily ?? LEGACY_FONT) === LEGACY_FONT;
   return {
     branding: {
       companyName: str(b.companyName, def.branding.companyName),
       logoAssetId: typeof b.logoAssetId === "string" ? b.logoAssetId : null,
-      primaryColor: str(b.primaryColor, def.branding.primaryColor),
+      primaryColor: untouched ? def.branding.primaryColor : str(b.primaryColor, def.branding.primaryColor),
       textColor: str(b.textColor, def.branding.textColor),
-      fontFamily: str(b.fontFamily, def.branding.fontFamily),
+      fontFamily: untouched ? def.branding.fontFamily : str(b.fontFamily, def.branding.fontFamily),
     },
     sender: {
       fromName: str(s.fromName, def.sender.fromName),
       fromEmail: str(s.fromEmail, def.sender.fromEmail),
       replyTo: str(s.replyTo),
     },
-    postalAddress: str(d.postalAddress),
+    postalAddress: str(d.postalAddress) || def.postalAddress,
     footerNote: str(d.footerNote, def.footerNote),
     updatedAt: iso(d.updatedAt),
     updatedBy: typeof d.updatedBy === "string" ? d.updatedBy : null,
@@ -66,10 +70,6 @@ export async function getSettings(): Promise<AppSettings> {
 export async function saveSettings(next: Omit<AppSettings, "updatedAt" | "updatedBy">, actor: string) {
   await ref().set({ ...next, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor });
   return getSettings();
-}
-
-export function fontStack(key: string): string {
-  return FONT_STACKS[key as FontKey] ?? FONT_STACKS.helvetica;
 }
 
 export interface SendReadiness {

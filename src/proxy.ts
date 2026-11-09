@@ -61,7 +61,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api|d/|_next/static|_next/image|favicon.ico|icon|robots.txt).*)",
+      // brand/ holds the logo and bullet images that email clients fetch without a session.
+      source: "/((?!api|d/|brand/|_next/static|_next/image|favicon.ico|icon|robots.txt).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },
