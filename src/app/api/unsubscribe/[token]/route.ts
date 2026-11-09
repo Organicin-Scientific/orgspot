@@ -1,19 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { unsubscribeRecipient } from "@/server/campaigns/events";
 import { log } from "@/server/logger";
-import { clientIp, enforceRateLimit } from "@/server/ratelimit";
 import { verifyToken } from "@/server/tokens";
 
 /**
  * RFC 8058 one-click unsubscribe (mailbox providers POST here without cookies), and the
  * confirmation form on /u/[token]. The signed token is the only credential required.
+ *
+ * There is deliberately no rate limit here. Gmail and Yahoo send one-click requests from
+ * shared infrastructure, so an IP-based limit could refuse a legitimate unsubscribe, and
+ * a refused unsubscribe is a compliance and spam-complaint risk. Invalid tokens are
+ * rejected by the HMAC check before any database work, and the write itself is idempotent.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const fields = verifyToken("unsub", token, 2);
   if (!fields) return NextResponse.json({ error: "invalid_link" }, { status: 404 });
   try {
-    await enforceRateLimit("publicLink", clientIp(req));
     await unsubscribeRecipient(fields[0], fields[1]);
   } catch (err) {
     log.error("unsubscribe.failed", { err });

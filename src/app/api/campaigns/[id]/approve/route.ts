@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { approveCampaign } from "@/server/campaigns/approve";
+import { triggerWorkerContinuation } from "@/server/campaigns/continuation";
 import { drainSendQueue } from "@/server/campaigns/worker";
 import { ok, readJson, withAdmin } from "@/server/http/handler";
 import { approveInput } from "@/server/http/schemas";
@@ -17,7 +18,9 @@ export const POST = withAdmin<{ id: string }>(
     const result = await approveCampaign(params.id, snapshotHash, session.email);
     after(async () => {
       try {
-        await drainSendQueue(55_000);
+        const run = await drainSendQueue(50_000);
+        // Lists larger than one invocation can send continue in a fresh invocation.
+        if (run.remaining) await triggerWorkerContinuation(0);
       } catch (err) {
         log.error("worker.after_approve_failed", { err });
       }

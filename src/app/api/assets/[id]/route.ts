@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/server/auth/session";
 import { getAsset, isStorageDisabledError, readFile, storageProblem } from "@/server/storage";
+import { contentDisposition } from "@/server/http/content-disposition";
 import { verifyToken } from "@/server/tokens";
 
 function notFound() {
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     "Cache-Control": isPublic ? "public, max-age=31536000, immutable" : "private, max-age=300",
   };
   if (asset.kind === "attachment") {
-    headers["Content-Disposition"] = `attachment; filename="${asset.filename.replace(/["\r\n\\]/g, "")}"`;
+    headers["Content-Disposition"] = contentDisposition("attachment", asset.filename);
   }
   return new Response(new Uint8Array(body), { headers });
 }
