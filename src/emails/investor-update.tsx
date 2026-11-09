@@ -337,8 +337,8 @@ export function InvestorUpdateEmail({ model }: { model: EmailModel }) {
                   <Img
                     src={m.branding.logoUrl}
                     alt={m.branding.companyName}
-                    width={280}
-                    style={{ display: "block", maxWidth: "280px", height: "auto", border: 0, margin: "0 auto" }}
+                    width={320}
+                    style={{ display: "block", maxWidth: "320px", height: "auto", border: 0, margin: "0 auto" }}
                   />
                 ) : (
                   <p

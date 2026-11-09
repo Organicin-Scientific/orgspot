@@ -20,6 +20,7 @@ import { BlocksMenuItems, SaveBlockDialog, useReusableBlocks } from "./blocks";
 import { EditorSidebar, type Meta } from "./editor-sidebar";
 import { PreviewDialog } from "./preview-dialog";
 import { TestSendDialog } from "./test-send-dialog";
+import { DEFAULT_LOGO_PATH } from "@/lib/brand";
 
 type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
 
@@ -284,14 +285,12 @@ export function UpdateEditor({
           )}
           <article className="doc-page mx-auto mt-3 max-w-[760px] rounded-sm border border-black/5 shadow-sm" style={docStyle}>
             <div className="px-6 pt-10 pb-4 text-center sm:px-14">
-              {branding.logoAssetId ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/assets/${branding.logoAssetId}`} alt={branding.companyName} className="mx-auto h-12 w-auto" />
-              ) : (
-                <div className="text-xl font-bold tracking-tight" style={{ color: branding.primaryColor }}>
-                  {branding.companyName}
-                </div>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={branding.logoAssetId ? `/api/assets/${branding.logoAssetId}` : DEFAULT_LOGO_PATH}
+                alt={branding.companyName}
+                className="mx-auto h-8 w-auto max-w-full"
+              />
             </div>
             {meta.bannerAssetId && (
               // eslint-disable-next-line @next/next/no-img-element

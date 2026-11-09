@@ -226,7 +226,7 @@ export function SettingsForm({
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">PNG or JPEG, ideally at least 400 px wide. Without a logo, the company name is shown.</p>
+                <p className="text-xs text-muted-foreground">PNG or JPEG, ideally at least 400 px wide. Without an upload, the Organicin wordmark is used.</p>
               </div>
             </CardContent>
           </Card>
