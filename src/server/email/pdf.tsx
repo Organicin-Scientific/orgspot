@@ -2,7 +2,7 @@ import "server-only";
 import path from "node:path";
 import * as React from "react";
 import { Document, Font, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { BRAND_GOLD } from "@/lib/brand";
+import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
 import type { AppSettings } from "@/lib/types";
 import { loadAssetBuffers } from "../storage";
@@ -142,7 +142,7 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
     }
     case "pullQuote":
       return (
-        <Text style={{ ...s.para, fontFamily: ctx.f.italic, fontSize: 12.5, textAlign: "center", color: ctx.color, paddingHorizontal: 18, marginBottom: 12 }}>
+        <Text style={{ ...s.para, fontFamily: ctx.f.italic, fontSize: 12.5, textAlign: "center", color: QUOTE_GREY, paddingHorizontal: 18, marginBottom: 12 }}>
           <Inline nodes={node.content} ctx={{ ...ctx, f: { ...ctx.f, regular: ctx.f.italic, bold: ctx.f.boldItalic } }} />
         </Text>
       );
@@ -304,7 +304,6 @@ export async function renderUpdatePdf(input: PdfInput): Promise<Buffer> {
               {b.companyName.toUpperCase()}
             </Text>
           )}
-          <View style={{ width: 36, borderTopWidth: 1.5, borderTopColor: BRAND_GOLD, marginTop: 10 }} />
           <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 6 }}>{input.dateLabel}</Text>
         </View>
         {banner ? (

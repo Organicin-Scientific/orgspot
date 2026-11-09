@@ -10,6 +10,8 @@ export const LEAF_BULLET_SVG_PATH = "/brand/leaf-bullet.svg";
 
 export const BRAND_GREEN = "#157A6E";
 export const BRAND_GOLD = "#F2B772";
+/** Pull quotes stay a neutral dark grey. */
+export const QUOTE_GREY = "#4b5563";
 
 export const FONT_STACKS = {
   nunito: "'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Body, Container, Head, Html, Img, Link, Preview } from "@react-email/components";
+import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode, Mark, MetricItem } from "@/lib/content/schema";
 
 export interface EmailBranding {
@@ -8,7 +9,6 @@ export interface EmailBranding {
   /** Leaf bullet image for unordered lists; null falls back to a standard disc. */
   bulletUrl: string | null;
   primaryColor: string;
-  accentColor: string;
   textColor: string;
   fontStack: string;
 }
@@ -184,7 +184,7 @@ function Block({ node, ctx }: { node: BlockNode; ctx: Ctx }): React.ReactElement
             fontSize: "18px",
             lineHeight: "28px",
             textAlign: "center",
-            color: m.branding.primaryColor,
+            color: QUOTE_GREY,
             margin: "0 0 18px",
             padding: "0 12px",
           })}
@@ -408,15 +408,6 @@ export function InvestorUpdateEmail({ model }: { model: EmailModel }) {
                     {m.branding.companyName.toUpperCase()}
                   </p>
                 )}
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style={{ paddingTop: "14px" }}>
-                <Table align="center" style={{ width: "48px" }}>
-                  <tr>
-                    <td style={{ borderTop: `2px solid ${m.branding.accentColor}`, fontSize: 0, lineHeight: 0 }}>&nbsp;</td>
-                  </tr>
-                </Table>
               </td>
             </tr>
           </Table>

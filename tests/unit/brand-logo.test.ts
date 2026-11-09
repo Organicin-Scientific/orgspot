@@ -70,7 +70,7 @@ describe("brand defaults", () => {
     const html = await render(createElement(InvestorUpdateEmail, { model: buildModel(input(null)) }));
     expect(html).toContain("https://app.example.test/brand/leaf-bullet.png");
     expect(html).not.toContain("<ul");
-    expect(html.toLowerCase()).toContain("2px solid #f2b772");
+    expect(html.toLowerCase()).not.toContain("#f2b772");
     expect(html).toContain("family=Nunito+Sans");
     expect(html).toContain("text-transform:uppercase");
     if (process.env.BRAND_HTML_OUT) (await import("node:fs")).writeFileSync(process.env.BRAND_HTML_OUT, html);

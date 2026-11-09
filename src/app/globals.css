@@ -220,7 +220,6 @@
  */
 .doc-page {
   --doc-brand: #157a6e;
-  --doc-accent: #f2b772;
   --doc-text: #1a1a1a;
   --doc-font: var(--font-nunito-sans), "Nunito Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   background: #ffffff;
@@ -276,12 +275,7 @@
   height: 0.72em;
   background: url("/brand/leaf-bullet.svg") no-repeat center / contain;
 }
-.doc-page .doc-header-rule {
-  width: 48px;
-  height: 0;
-  margin: 14px auto 0;
-  border-top: 2px solid var(--doc-accent);
-}
+
 .doc-page ol {
   list-style: decimal;
   padding-left: 1.5em;

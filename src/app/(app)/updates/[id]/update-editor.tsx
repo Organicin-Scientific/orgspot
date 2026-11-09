@@ -295,7 +295,6 @@ export function UpdateEditor({
                 alt={branding.companyName}
                 className="mx-auto h-8 w-auto max-w-full"
               />
-              <div className="doc-header-rule" aria-hidden />
             </div>
             {meta.bannerAssetId && (
               // eslint-disable-next-line @next/next/no-img-element
