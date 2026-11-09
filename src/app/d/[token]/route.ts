@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { campaignsCol, getCampaign, recipientsCol, snapshotPaths } from "@/server/campaigns/repo";
 import { pdfFilename } from "@/server/email/render";
+import { contentDisposition } from "@/server/http/content-disposition";
 import { log } from "@/server/logger";
 import { clientIp, enforceRateLimit } from "@/server/ratelimit";
 import { getAsset, readFile } from "@/server/storage";
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     return new Response(new Uint8Array(body), {
       headers: {
         "Content-Type": mime,
-        "Content-Disposition": `${mime === "application/pdf" ? "inline" : "attachment"}; filename="${filename.replace(/["\r\n\\]/g, "")}"`,
+        "Content-Disposition": contentDisposition(mime === "application/pdf" ? "inline" : "attachment", filename),
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
         "X-Robots-Tag": "noindex",

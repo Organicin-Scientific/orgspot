@@ -102,6 +102,12 @@ Approving a campaign still starts sending immediately in the API handler (`after
 
 Admins can also **POST** `/api/internal/worker` (session + CSRF) from the campaign analytics page to continue a large send without waiting for cron.
 
+When a run ends with recipients still queued, the worker starts a fresh invocation of itself (`src/server/campaigns/continuation.ts`), so large lists finish without a manual resume. Chaining stops after 60 hops.
+
+### Frequent schedule via GitHub Actions
+
+The Hobby plan allows only a daily Vercel cron, and the worker moves any send interrupted for more than 23 hours to manual review. `.github/workflows/send-worker.yml` calls the worker every 10 minutes so retries run on time. To enable it, add a repository **variable** `ORGSPOT_URL` (for example `https://orgspot.vercel.app`) and a repository **secret** `CRON_SECRET` matching Vercel. The job is skipped until `ORGSPOT_URL` exists.
+
 Set `CRON_SECRET` in Vercel (production) to a long random value and match it in the platform’s cron secret configuration if applicable.
 
 ## Resend
