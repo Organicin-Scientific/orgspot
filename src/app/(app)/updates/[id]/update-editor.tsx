@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import DOMPurify from "dompurify";
-import { AlertTriangle, Check, ChevronLeft, Copy, Eye, GripVertical, Loader2, Send, SendHorizonal } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, Copy, Eye, GripVertical, Loader2, Send, SendHorizonal, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { editorExtensions } from "@/components/editor/extensions";
 import { EditorToolbar } from "@/components/editor/toolbar";
@@ -19,6 +19,7 @@ import type { Branding, PdfDelivery, UpdateDoc } from "@/lib/types";
 import { BlocksMenuItems, SaveBlockDialog, useReusableBlocks } from "./blocks";
 import { EditorSidebar, type Meta } from "./editor-sidebar";
 import { PreviewDialog } from "./preview-dialog";
+import { AiDraftDialog } from "./ai-draft-dialog";
 import { TestSendDialog } from "./test-send-dialog";
 import { DEFAULT_LOGO_PATH, editorFontStack } from "@/lib/brand";
 
@@ -33,6 +34,7 @@ export function UpdateEditor({
   footerNote,
   adminEmail,
   liveSending,
+  aiDraftEnabled,
 }: {
   initial: UpdateDoc;
   branding: Branding;
@@ -40,6 +42,7 @@ export function UpdateEditor({
   footerNote: string;
   adminEmail: string;
   liveSending: boolean;
+  aiDraftEnabled: boolean;
 }) {
   const router = useRouter();
   const editable = EDITABLE.has(initial.status);
@@ -56,6 +59,7 @@ export function UpdateEditor({
   const [savedAt, setSavedAt] = useState(initial.updatedAt);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [saveBlockOpen, setSaveBlockOpen] = useState(false);
   const reusable = useReusableBlocks();
@@ -234,6 +238,17 @@ export function UpdateEditor({
           </Button>
           {editable ? (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await flush();
+                  setAiDraftOpen(true);
+                }}
+                title={aiDraftEnabled ? "Fill template prompts with Gemini" : "Enable AI drafting in server settings"}
+              >
+                <Sparkles /> Draft with AI
+              </Button>
               <Button variant="outline" size="sm" onClick={async () => { await flush(); setTestOpen(true); }}>
                 <SendHorizonal /> Send test
               </Button>
@@ -337,6 +352,19 @@ export function UpdateEditor({
       <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} updateId={initial.id} meta={meta} getContent={() => (editor?.getJSON() ?? initial.content) as DocNode} />
       {editor && <SaveBlockDialog open={saveBlockOpen} onOpenChange={setSaveBlockOpen} editor={editor} onSaved={reusable.add} />}
       <TestSendDialog open={testOpen} onOpenChange={setTestOpen} updateId={initial.id} defaultEmail={adminEmail} liveSending={liveSending} />
+      <AiDraftDialog
+        open={aiDraftOpen}
+        onOpenChange={setAiDraftOpen}
+        updateId={initial.id}
+        enabled={aiDraftEnabled}
+        getContent={() => (editor?.getJSON() ?? initial.content) as DocNode}
+        onApply={(content) => {
+          editor?.commands.setContent(content, { emitUpdate: true });
+          dirtyRef.current = true;
+          setSaveState("dirty");
+          void save("manual", { silent: true });
+        }}
+      />
     </div>
   );
 }

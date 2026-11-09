@@ -34,6 +34,10 @@ const schema = z
     CRON_SECRET: z.string().min(32),
     TOKEN_SIGNING_SECRET: z.string().min(32),
     PDF_LINK_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+
+    AI_DRAFT_ENABLED: bool,
+    GEMINI_MODEL: z.string().max(80).optional(),
+    VERTEX_GEMINI_LOCATION: z.string().max(40).optional(),
   })
   .superRefine((env, ctx) => {
     const isProd = env.APP_ENV === "production" || env.VERCEL_ENV === "production";
@@ -67,6 +71,8 @@ export type Env = z.infer<typeof schema> & {
   usesEmulators: boolean;
   /** True only when real email may leave the system. */
   liveSending: boolean;
+  /** Vertex Gemini template drafting (admin-only API). */
+  AI_DRAFT_ENABLED: boolean;
 };
 
 let cached: Env | null = null;
@@ -83,7 +89,13 @@ export function env(): Env {
   const usesEmulators = Boolean(e.FIRESTORE_EMULATOR_HOST || e.FIREBASE_AUTH_EMULATOR_HOST);
   // Real sending requires production *and* an explicit opt-in flag. Preview and local never send.
   const liveSending = isProduction && e.EMAIL_SENDING_ENABLED && Boolean(e.RESEND_API_KEY);
-  cached = { ...e, isProduction, usesEmulators, liveSending };
+  cached = {
+    ...e,
+    isProduction,
+    usesEmulators,
+    liveSending,
+    AI_DRAFT_ENABLED: Boolean(e.AI_DRAFT_ENABLED),
+  };
   return cached;
 }
 

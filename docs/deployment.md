@@ -46,6 +46,9 @@ Variables are defined in `.env.example` and validated in `src/server/env.ts`. Be
 | `CRON_SECRET` | Bearer for `/api/internal/worker` | Minimum 32 characters |
 | `TOKEN_SIGNING_SECRET` | HMAC for unsubscribe and file tokens | Minimum 32 characters |
 | `PDF_LINK_TTL_DAYS` | Expiry for signed download links | Default 30 |
+| `AI_DRAFT_ENABLED` | Vertex Gemini template drafting in the update editor | Default false; needs service account + Vertex AI API |
+| `GEMINI_MODEL` | Vertex model id | Default `gemini-3.8-flash` |
+| `VERTEX_GEMINI_LOCATION` | Vertex region | Default `us-central1` |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Client Firebase config | Public |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Client auth domain | Often set to the **app’s own domain** in production (see below) |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Client project id | Public |

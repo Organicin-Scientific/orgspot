@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/server/auth/session";
 import { getSettings } from "@/server/db/settings";
 import { getUpdate } from "@/server/db/updates";
+import { aiDraftConfigured } from "@/server/ai/config";
 import { env } from "@/server/env";
 import { UpdateEditor } from "./update-editor";
 
@@ -20,6 +21,7 @@ export default async function EditUpdatePage({ params }: { params: Promise<{ id:
       footerNote={settings.footerNote}
       adminEmail={session.email}
       liveSending={env().liveSending}
+      aiDraftEnabled={aiDraftConfigured()}
     />
   );
 }
