@@ -1,0 +1,5 @@
+first_name,last_name,email,organization
+Alex,Rivera,alex.rivera.0@example.com,Example Ventures
+Invalid,Row,not-an-email,Sample Org
+E2E,NewAlpha,e2e-import-new-alpha@example.com,Synthetic Holdings
+E2E,NewDup,e2e-import-new-alpha@example.com,Duplicate Row Same Email

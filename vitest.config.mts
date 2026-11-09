@@ -1,0 +1,51 @@
+import path from 'node:path';
+import { defineConfig } from 'vitest/config';
+
+const root = import.meta.dirname;
+
+const alias = {
+  '@': path.resolve(root, 'src'),
+  'server-only': path.resolve(root, 'tests/stubs/server-only.ts'),
+};
+
+export default defineConfig({
+  resolve: {
+    alias,
+  },
+  test: {
+    projects: [
+      {
+        extends: true,
+        resolve: {
+          alias,
+        },
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
+      {
+        extends: true,
+        resolve: {
+          alias,
+        },
+        test: {
+          name: 'emulator',
+          include: [
+            'tests/rules/**/*.test.ts',
+            'tests/integration/**/*.test.ts',
+          ],
+          setupFiles: [
+            'tests/integration/setup-env.ts',
+            'tests/integration/setup.ts',
+          ],
+          environment: 'node',
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          fileParallelism: false,
+        },
+      },
+    ],
+  },
+});

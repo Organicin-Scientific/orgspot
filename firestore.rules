@@ -1,0 +1,9 @@
+rules_version = '2';
+// Client SDK access is denied; production reads/writes go through Next.js route handlers using the Firebase Admin SDK (bypasses rules).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
