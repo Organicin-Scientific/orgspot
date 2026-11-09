@@ -4,6 +4,7 @@ import { Document, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } f
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
 import type { AppSettings } from "@/lib/types";
 import { loadAssetBuffers } from "../storage";
+import { DEFAULT_LOGO_PNG } from "./default-logo";
 
 type ImageMap = Map<string, { buf: Buffer; mime: string }>;
 
@@ -230,7 +231,7 @@ export async function renderUpdatePdf(input: PdfInput): Promise<Buffer> {
   const images = await loadAssetBuffers(collectIds(input));
   const b = input.settings.branding;
   const ctx: Ctx = { color: b.primaryColor, text: b.textColor, images };
-  const logo = pdfImage(images, b.logoAssetId);
+  const logo = b.logoAssetId ? pdfImage(images, b.logoAssetId) : { data: DEFAULT_LOGO_PNG, format: "png" as const };
   const banner = pdfImage(images, input.bannerAssetId);
   const doc = (
     <Document title={input.title} author={b.companyName} creator={b.companyName} producer={b.companyName}>
