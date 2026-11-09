@@ -6,7 +6,7 @@ import { InvestorUpdateEmail, type EmailModel } from "@/emails/investor-update";
 import { docToPlainText } from "@/lib/content/plain-text";
 import type { DocNode } from "@/lib/content/schema";
 import type { AppSettings, PdfDelivery } from "@/lib/types";
-import { DEFAULT_LOGO_PATH } from "@/lib/brand";
+import { DEFAULT_LOGO_PATH, LEAF_BULLET_PNG_PATH } from "@/lib/brand";
 import { fontStack } from "../db/settings";
 import { env } from "../env";
 import { assetUrl, type StoredAsset } from "../storage";
@@ -60,6 +60,7 @@ export function buildModel(input: RenderInput): EmailModel {
       logoUrl: settings.branding.logoAssetId
         ? imageUrl(settings.branding.logoAssetId)
         : `${env().APP_URL}${DEFAULT_LOGO_PATH}`,
+      bulletUrl: `${env().APP_URL}${LEAF_BULLET_PNG_PATH}`,
       primaryColor: settings.branding.primaryColor,
       textColor: settings.branding.textColor,
       fontStack: fontStack(settings.branding.fontFamily),

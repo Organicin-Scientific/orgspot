@@ -149,7 +149,7 @@ export const settingsInput = z.object({
     logoAssetId: id.nullable(),
     primaryColor: hex,
     textColor: hex,
-    fontFamily: z.enum(["helvetica", "georgia", "verdana", "trebuchet"]),
+    fontFamily: z.enum(["nunito", "helvetica", "georgia", "verdana", "trebuchet"]),
   }),
   sender: z.object({
     fromName: text(100).min(1, "Sender name is required").refine((v) => !/[<>"\r\n]/.test(v), "Sender name contains invalid characters"),

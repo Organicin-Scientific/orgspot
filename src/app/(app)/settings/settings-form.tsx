@@ -39,6 +39,7 @@ interface DomainResponse {
 }
 
 const FONTS = [
+  ["nunito", "Nunito Sans (brand)"],
   ["helvetica", "Helvetica / Arial"],
   ["georgia", "Georgia (serif)"],
   ["verdana", "Verdana"],

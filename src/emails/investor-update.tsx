@@ -1,10 +1,13 @@
 import * as React from "react";
 import { Body, Container, Head, Html, Img, Link, Preview } from "@react-email/components";
+import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode, Mark, MetricItem } from "@/lib/content/schema";
 
 export interface EmailBranding {
   companyName: string;
   logoUrl: string | null;
+  /** Leaf bullet image for unordered lists; null falls back to a standard disc. */
+  bulletUrl: string | null;
   primaryColor: string;
   textColor: string;
   fontStack: string;
@@ -102,15 +105,27 @@ function Table({ children, style, align }: { children: React.ReactNode; style?: 
 
 function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
   const width = `${Math.floor(100 / items.length)}%`;
+  const anySublabel = items.some((it) => it.sublabel);
   return (
     <Table style={{ margin: "8px 0 22px" }}>
       <tr>
         {items.map((it, i) => (
           <td key={i} width={width} valign="top" align="center" style={{ padding: "4px 6px", textAlign: "center" }}>
-            <p style={textStyle(ctx.m, { margin: "0", fontSize: "13px", lineHeight: "18px" })}>{it.label}</p>
-            {it.sublabel ? (
+            <p
+              style={textStyle(ctx.m, {
+                margin: "0",
+                fontSize: "11px",
+                lineHeight: "16px",
+                fontWeight: 900,
+                letterSpacing: "0.8px",
+                textTransform: "uppercase",
+              })}
+            >
+              {it.label}
+            </p>
+            {anySublabel ? (
               <p style={textStyle(ctx.m, { margin: "0", fontSize: "10px", lineHeight: "14px", color: MUTED })}>
-                {it.sublabel}
+                {it.sublabel || "\u00a0"}
               </p>
             ) : null}
             <p
@@ -163,11 +178,41 @@ function Block({ node, ctx }: { node: BlockNode; ctx: Ctx }): React.ReactElement
     }
     case "pullQuote":
       return (
-        <p style={textStyle(m, { fontStyle: "italic", margin: "0 0 16px" })}>
+        <p
+          style={textStyle(m, {
+            fontStyle: "italic",
+            fontSize: "18px",
+            lineHeight: "28px",
+            textAlign: "center",
+            color: QUOTE_GREY,
+            margin: "0 0 18px",
+            padding: "0 12px",
+          })}
+        >
           <Inline nodes={node.content} ctx={ctx} />
         </p>
       );
     case "bulletList":
+      if (m.branding.bulletUrl) {
+        const bulletUrl = m.branding.bulletUrl;
+        return (
+          <Table style={{ margin: "0 0 16px" }}>
+            {node.content.map((li, i) => (
+              <tr key={i}>
+                <td width={22} valign="top" style={{ width: "22px", paddingTop: "7px" }}>
+                  <Img src={bulletUrl} alt="" width={11} height={11} style={{ display: "block", border: 0 }} />
+                </td>
+                <td valign="top" style={{ paddingBottom: "8px" }}>
+                  {li.content.map((c, j) => (
+                    <Block key={j} node={c} ctx={{ ...ctx, tight: true }} />
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </Table>
+        );
+      }
+    // falls through to a standard list
     case "orderedList": {
       const ListTag = node.type === "bulletList" ? "ul" : "ol";
       const start = node.type === "orderedList" ? (node.attrs?.start ?? 1) : undefined;
@@ -306,6 +351,14 @@ export function InvestorUpdateEmail({ model }: { model: EmailModel }) {
       <Head>
         <meta name="color-scheme" content="light only" />
         <meta name="supported-color-schemes" content="light" />
+        {m.branding.fontStack.includes("Nunito Sans") ? (
+          // An email, not a Next.js page: clients that honour web fonts load Nunito Sans, the rest fall back.
+          // eslint-disable-next-line @next/next/no-page-custom-font
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,400;0,700;0,900;1,400&display=swap"
+          />
+        ) : null}
       </Head>
       {m.previewText ? <Preview>{m.previewText}</Preview> : null}
       <Body style={{ margin: 0, padding: 0, backgroundColor: "#ffffff", fontFamily: m.branding.fontStack }}>

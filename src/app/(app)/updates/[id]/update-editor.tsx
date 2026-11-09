@@ -20,7 +20,7 @@ import { BlocksMenuItems, SaveBlockDialog, useReusableBlocks } from "./blocks";
 import { EditorSidebar, type Meta } from "./editor-sidebar";
 import { PreviewDialog } from "./preview-dialog";
 import { TestSendDialog } from "./test-send-dialog";
-import { DEFAULT_LOGO_PATH } from "@/lib/brand";
+import { DEFAULT_LOGO_PATH, editorFontStack } from "@/lib/brand";
 
 type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
 
@@ -203,7 +203,11 @@ export function UpdateEditor({
     setStatus(u.status);
   }
 
-  const docStyle = { "--doc-brand": branding.primaryColor, "--doc-text": branding.textColor } as React.CSSProperties;
+  const docStyle = {
+    "--doc-brand": branding.primaryColor,
+    "--doc-text": branding.textColor,
+    "--doc-font": editorFontStack(branding.fontFamily),
+  } as React.CSSProperties;
 
   return (
     <div className="flex min-h-svh flex-col">

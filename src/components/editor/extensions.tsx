@@ -169,7 +169,7 @@ export const PullQuote = Node.create({
     "p",
     mergeAttributes(HTMLAttributes, {
       "data-type": "pull-quote",
-      class: "text-center text-[19px] italic leading-relaxed text-[var(--doc-brand)] px-6 my-4",
+      class: "text-center text-[19px] italic leading-relaxed text-[#4b5563] px-6 my-4",
     }),
     0,
   ],
