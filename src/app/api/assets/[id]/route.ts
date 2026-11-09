@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/server/auth/session";
-import { readFile, getAsset } from "@/server/storage";
+import { getAsset, isStorageDisabledError, readFile, storageProblem } from "@/server/storage";
 import { verifyToken } from "@/server/tokens";
 
 function notFound() {
@@ -25,7 +25,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!tokenOk && !sessionOk) return notFound();
   }
 
-  const body = await readFile(asset.storagePath);
+  let body: Buffer;
+  try {
+    body = await readFile(asset.storagePath);
+  } catch (err) {
+    if (isStorageDisabledError(err) || (await storageProblem())) {
+      return new Response("File storage is not available", { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+    return notFound();
+  }
   const headers: Record<string, string> = {
     "Content-Type": asset.mime,
     "X-Content-Type-Options": "nosniff",

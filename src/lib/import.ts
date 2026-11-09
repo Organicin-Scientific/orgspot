@@ -17,14 +17,29 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
 export const MAX_IMPORT_ROWS = 5000;
 
 const SYNONYMS: Record<ImportField, string[]> = {
-  email: ["email", "email address", "e-mail", "mail", "emailaddress", "primary email"],
+  email: ["email", "email address", "e-mail", "mail", "emailaddress", "primary email", "work email", "contact email"],
   firstName: ["first name", "firstname", "first", "given name", "forename"],
   lastName: ["last name", "lastname", "last", "surname", "family name"],
   fullName: ["name", "full name", "fullname", "contact name", "contact"],
-  organization: ["organization", "organisation", "company", "firm", "fund", "company name", "org"],
-  category: ["category", "type", "investor type", "segment", "tier", "lifecycle stage"],
+  organization: [
+    "organization",
+    "organisation",
+    "company",
+    "firm",
+    "fund",
+    "company name",
+    "org",
+    "associated company",
+  ],
+  category: ["category", "type", "investor type", "segment", "tier", "lifecycle stage", "lead status"],
   notes: ["notes", "note", "comments", "comment", "description"],
 };
+
+/** Google Contacts CSV uses headers such as `E-mail 1 - Value`. */
+function isGoogleEmailColumn(header: string): boolean {
+  const h = clean(header);
+  return /^e mail \d+ value$/.test(h) || /^e mail \d+$/.test(h);
+}
 
 const clean = (h: string) => h.trim().toLowerCase().replace(/[_\-.]+/g, " ").replace(/\s+/g, " ");
 
@@ -39,7 +54,7 @@ export function suggestMapping(headers: string[]): ColumnMapping {
     }
   }
   if (mapping.email === undefined) {
-    const idx = headers.findIndex((h, i) => !used.has(i) && clean(h).includes("email"));
+    const idx = headers.findIndex((h, i) => !used.has(i) && (clean(h).includes("email") || isGoogleEmailColumn(h)));
     if (idx >= 0) mapping.email = idx;
   }
   // A "name" column maps to fullName, but explicit first/last columns must win — mixing breaks preview/commit.

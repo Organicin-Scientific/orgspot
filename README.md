@@ -89,6 +89,7 @@ Firebase security rules deny direct client access to Firestore and Storage; the 
 ## Documentation index
 
 - [docs/deployment.md](docs/deployment.md) — Vercel, Firebase production, Resend, cron, environment variables  
+- [docs/investor-import.md](docs/investor-import.md) — CSV/xlsx import for real contact lists  
 - [docs/security.md](docs/security.md) — Threat model and controls  
 - [docs/data-model.md](docs/data-model.md) — Firestore collections and Storage paths  
 - [docs/backup-recovery.md](docs/backup-recovery.md) — Backups, recovery, interrupted sends  

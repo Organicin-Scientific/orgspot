@@ -114,6 +114,10 @@ Set `CRON_SECRET` in Vercel (production) to a long random value and match it in 
 6. Put the Svix signing secret into **`RESEND_WEBHOOK_SECRET`** (used by `Webhook` from the `svix` package in `src/app/api/webhooks/resend/route.ts`).
 7. **Open/click tracking** toggles are per domain in Resend (surfaced in the API via domain status in `src/server/email/resend-provider.ts`).
 
+## Node.js and `firebase-admin`
+
+`firebase-admin` pulls in `jwks-rsa`, which must load `jose` on Node without `NODE_OPTIONS=--experimental-require-module`. This repo pins **`jose@5.9.6`** under `jwks-rsa` via `package.json` `overrides` so session verification works on Vercel with Node 22.x. After deploying that change, **remove** the `NODE_OPTIONS=--experimental-require-module` production env var.
+
 ## Pre-launch checklist
 
 - [ ] Production Firebase project isolated from dev/preview; Vercel Production env vars only on Production  

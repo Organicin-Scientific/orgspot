@@ -20,6 +20,7 @@ interface Context {
   liveSending: boolean;
   provider: string;
   configuredSenderEmail: string | null;
+  storageNotice: string | null;
 }
 
 interface DomainResponse {
@@ -117,6 +118,14 @@ export function SettingsForm({
     <>
       <PageHeader title="Settings" description="Branding and sender details used in every update." />
       <PageBody className="max-w-4xl">
+        {context.storageNotice && (
+          <Alert>
+            <AlertTriangle />
+            <AlertTitle>File uploads are unavailable</AlertTitle>
+            <AlertDescription>{context.storageNotice}</AlertDescription>
+          </Alert>
+        )}
+
         {!readiness.ready && (
           <Alert>
             <AlertTriangle />

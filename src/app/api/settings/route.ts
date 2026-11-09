@@ -1,5 +1,5 @@
 import { audit } from "@/server/audit";
-import { getSettings, saveSettings, sendReadiness } from "@/server/db/settings";
+import { fullSendReadiness, getSettings, saveSettings } from "@/server/db/settings";
 import { env } from "@/server/env";
 import { emailProvider } from "@/server/email";
 import { ok, readJson, withAdmin } from "@/server/http/handler";
@@ -17,7 +17,7 @@ function context() {
 
 export const GET = withAdmin(async () => {
   const settings = await getSettings();
-  return ok({ settings, readiness: sendReadiness(settings), context: context() });
+  return ok({ settings, readiness: await fullSendReadiness(settings), context: context() });
 });
 
 export const PUT = withAdmin(async ({ req, session }) => {
@@ -25,5 +25,5 @@ export const PUT = withAdmin(async ({ req, session }) => {
   await saveSettings(input, session.email);
   await audit({ actorEmail: session.email, action: "settings.update", resourceType: "settings", resourceId: "app", summary: "Updated branding and sender settings" });
   const settings = await getSettings();
-  return ok({ settings, readiness: sendReadiness(settings), context: context() });
+  return ok({ settings, readiness: await fullSendReadiness(settings), context: context() });
 });
