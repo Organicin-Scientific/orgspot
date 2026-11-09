@@ -142,6 +142,79 @@
 }
 
 /*
+ * Motion tokens. The dashboard is a work surface people open many times a day, so motion is
+ * reserved for first paint and press feedback, kept under 300ms, and uses strong ease-out
+ * curves rather than the weak CSS defaults.
+ */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Staggered entrance for dashboard panels. Set --i on each panel (0, 1, 2…). */
+.dash-enter {
+  animation: dash-enter 280ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes dash-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Bars grow from their start edge on first paint. */
+.dash-bar {
+  transform-origin: left center;
+  animation: dash-bar 520ms var(--ease-out) both;
+  animation-delay: calc(120ms + var(--i, 0) * 60ms);
+}
+.dash-bar-v {
+  transform-origin: center bottom;
+  animation: dash-bar-v 480ms var(--ease-out) both;
+  animation-delay: calc(120ms + var(--i, 0) * 40ms);
+}
+@keyframes dash-bar {
+  from {
+    transform: scaleX(0.02);
+  }
+}
+@keyframes dash-bar-v {
+  from {
+    transform: scaleY(0.04);
+  }
+}
+
+/* Press feedback for clickable panels and rows. */
+.pressable {
+  transition:
+    transform 160ms var(--ease-out),
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.pressable:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-enter {
+    animation: dash-fade 200ms ease both;
+  }
+  .dash-bar,
+  .dash-bar-v {
+    animation: none;
+  }
+  .pressable:active {
+    transform: none;
+  }
+}
+@keyframes dash-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
  * The editor "page" mirrors the email/PDF rendering: always a white sheet with the
  * brand's text colour, regardless of the app theme.
  */
