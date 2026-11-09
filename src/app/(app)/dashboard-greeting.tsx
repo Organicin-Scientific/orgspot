@@ -15,11 +15,20 @@ export function DashboardGreeting({ name }: { name: string }) {
   const date = now?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   return (
     <div className="space-y-1">
-      <p className="h-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">{date ?? ""}</p>
-      <h1 className="text-2xl font-semibold tracking-tight">
+      <div className="flex h-4 items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {/* The page's h1 stays "Dashboard" so screen readers and tests can find the page by name. */}
+        <h1>Dashboard</h1>
+        {date && (
+          <>
+            <span aria-hidden>·</span>
+            <span>{date}</span>
+          </>
+        )}
+      </div>
+      <p className="text-2xl font-semibold tracking-tight">
         {now ? greeting(now.getHours()) : "Welcome back"}
         {name ? `, ${name}` : ""}
-      </h1>
+      </p>
     </div>
   );
 }

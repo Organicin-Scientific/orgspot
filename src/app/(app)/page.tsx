@@ -52,7 +52,7 @@ export default async function DashboardPage() {
               Investors
             </Link>
           </Button>
-          <NewUpdateButton />
+          <NewUpdateButton label="Start an update" />
         </div>
       </header>
 
