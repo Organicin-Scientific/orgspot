@@ -62,7 +62,17 @@ function friendly(err: unknown): string {
   return err instanceof Error ? err.message : "Sign-in failed. Please try again.";
 }
 
-export function LoginForm({ next, expired, devLogin }: { next: string; expired: boolean; devLogin: boolean }) {
+export function LoginForm({
+  next,
+  expired,
+  devLogin,
+  configError,
+}: {
+  next: string;
+  expired: boolean;
+  devLogin: boolean;
+  configError?: string | null;
+}) {
   const [step, setStep] = useState<Step>({ kind: "start" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(expired ? "Your session has ended. Please sign in again." : null);
@@ -167,6 +177,11 @@ export function LoginForm({ next, expired, devLogin }: { next: string; expired: 
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {configError && (
+          <Alert variant="destructive">
+            <AlertDescription>{configError}</AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -175,7 +190,7 @@ export function LoginForm({ next, expired, devLogin }: { next: string; expired: 
 
         {step.kind === "start" && (
           <>
-            <Button className="w-full" size="lg" onClick={startGoogle} disabled={busy}>
+            <Button className="w-full" size="lg" onClick={startGoogle} disabled={busy || !!configError}>
               {busy ? <Loader2 className="animate-spin" /> : <GoogleMark />}
               Continue with Google
             </Button>
