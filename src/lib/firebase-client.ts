@@ -21,7 +21,11 @@ export async function clientAuth(): Promise<Auth> {
     });
   auth = getAuth(app);
   const emulator = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST;
-  if (emulator) connectAuthEmulator(auth, `http://${emulator}`, { disableWarnings: true });
+  const local =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  // Never point hosted previews/production at a local Auth emulator (common .env copy mistake).
+  if (emulator && local) connectAuthEmulator(auth, `http://${emulator}`, { disableWarnings: true });
   await setPersistence(auth, inMemoryPersistence);
   return auth;
 }
