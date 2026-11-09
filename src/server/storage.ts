@@ -15,6 +15,14 @@ const STORAGE_PROBE_MS = 60_000;
 const STORAGE_DISABLED_MESSAGE =
   "Firebase Storage is not enabled for this project. Upgrade Firebase to Blaze, create the default Storage bucket, then try again.";
 
+function storageProbeFailureMessage(err: unknown): string {
+  if (isStorageDisabledError(err)) return STORAGE_DISABLED_MESSAGE;
+  const detail = err instanceof Error ? err.message : String(err);
+  console.error("Storage probe failed:", detail);
+  const bucketName = env().FIREBASE_STORAGE_BUCKET;
+  return `Could not reach Firebase Storage bucket "${bucketName}". Check that the service account has access to it. (${detail.slice(0, 200)})`;
+}
+
 /** Null when uploads and campaign snapshots are expected to work. Cached briefly to avoid hammering GCS. */
 export async function storageProblem(): Promise<string | null> {
   if (env().usesEmulators) return null;
@@ -24,8 +32,10 @@ export async function storageProblem(): Promise<string | null> {
   try {
     const [exists] = await bucket().exists();
     if (!exists) problem = STORAGE_DISABLED_MESSAGE;
-  } catch {
-    problem = STORAGE_DISABLED_MESSAGE;
+  } catch (err) {
+    // Only a missing bucket means Storage is not enabled. Anything else (permissions, bad
+    // credentials, network) is reported as such so the fix points at the real cause.
+    problem = storageProbeFailureMessage(err);
   }
   storageProbe = { checkedAt: now, problem };
   return problem;

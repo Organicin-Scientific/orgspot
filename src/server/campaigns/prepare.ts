@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { collectAssetIds } from "@/lib/content/schema";
+import { templatePromptCount } from "@/lib/content/template";
 import { emptyStats } from "@/lib/delivery";
 import { normalizeEmail } from "@/lib/email-address";
 import type { ExcludedRecipient, Investor } from "@/lib/types";
@@ -132,6 +133,12 @@ export async function prepareCampaign(updateId: string, sel: AudienceSelection, 
     throw conflict("This update has already been sent or is sending.");
   }
   if (!update.subject.trim()) throw precondition("Add an email subject before preparing a send.");
+  const prompts = templatePromptCount(update.content);
+  if (prompts > 0) {
+    throw precondition(
+      `Replace the ${prompts} template prompt${prompts === 1 ? "" : "s"} marked "[Write: …]" before sending. Test sends still work while you draft.`,
+    );
+  }
 
   const settings = await getSettings();
   const readiness = await fullSendReadiness(settings);
