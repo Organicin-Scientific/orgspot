@@ -1,10 +1,27 @@
 import type { BlockNode, DocNode } from "./schema";
 
-const t = (text: string, marks?: ("bold" | "italic")[]) => ({
+/**
+ * Starter document for a quarterly investor update, built on the structure and voice of
+ * Organicin's 2026 quarterly emails: quote, "What do we do?", TL;DR, Commercial, R&D &
+ * Technology, Lowlights.
+ *
+ * Every placeholder is a writing prompt wrapped in PROMPT_OPEN … "]". Campaign preparation
+ * refuses to send while any prompt remains (see `templatePromptCount`), so a half-filled
+ * template can be previewed and test-sent but never reach investors.
+ *
+ * The repository is public, so prompts carry structure and style only, never figures,
+ * customer names or other confidential detail.
+ */
+
+export const PROMPT_OPEN = "[Write: ";
+
+type Mark = "bold" | "italic";
+const t = (text: string, marks?: Mark[]) => ({
   type: "text" as const,
   text,
   ...(marks ? { marks: marks.map((m) => ({ type: m })) } : {}),
 });
+const prompt = (text: string) => t(`${PROMPT_OPEN}${text}]`, ["italic"]);
 
 const p = (...content: ReturnType<typeof t>[]): BlockNode => ({ type: "paragraph", content });
 const h = (text: string, level: 1 | 2 | 3 = 2): BlockNode => ({
@@ -12,93 +29,151 @@ const h = (text: string, level: 1 | 2 | 3 = 2): BlockNode => ({
   attrs: { level },
   content: [t(text)],
 });
-const item = (lead: string, rest: string) => ({
-  type: "listItem" as const,
-  content: [p(t(lead, ["bold"]), t(` ${rest}`))],
+const bullets = (...items: ReturnType<typeof t>[][]): BlockNode => ({
+  type: "bulletList",
+  content: items.map((content) => ({ type: "listItem" as const, content: [p(...content)] })),
 });
 
-/**
- * Starter document mirroring the structure of past investor updates.
- * All text and numbers are synthetic placeholders and must be replaced before sending.
- */
+/** The company description that opens every update. Public marketing copy. */
+export const WHAT_WE_DO =
+  " Organicin Scientific discovers and develops bacteriocins (antimicrobial proteins that inhibit specific pathogens) to prevent disease and improve microbiome health.";
+
 export function starterDocument(): DocNode {
   return {
     type: "doc",
     content: [
-      { type: "pullQuote", content: [t("Add an opening quote or a one-line theme for this update.")] },
-      { type: "horizontalRule", attrs: { variant: "short" } },
+      {
+        type: "pullQuote",
+        content: [prompt("a one-line quote that sets the theme of the quarter, then - Name. Don't reuse a source from a past update.")],
+      },
+      p(t("What do we do?", ["bold"]), t(WHAT_WE_DO)),
       p(
-        t("What do we do?", ["bold"]),
-        t(" Replace this with a two-sentence description of the company for readers who are new to the business."),
+        t("TL;DR", ["bold"]),
+        t(" "),
+        prompt("two or three sentences carrying the quarter's three biggest facts, each with a number. Include the biggest setback if it changes the picture."),
       ),
-      { type: "horizontalRule", attrs: { variant: "short" } },
       {
         type: "metrics",
         attrs: {
           items: [
-            { label: "Metric one", sublabel: "", value: "$0.0K" },
-            { label: "Metric two", sublabel: "", value: "$0.0K" },
-            { label: "Metric three", sublabel: "Comparison period", value: "+0%" },
+            { label: "Revenue this quarter", sublabel: "", value: `${PROMPT_OPEN}revenue this quarter]` },
+            { label: "Contracts signed", sublabel: "", value: `${PROMPT_OPEN}contracts signed count]` },
+            { label: "Pipeline", sublabel: "next two quarters", value: `${PROMPT_OPEN}pipeline next 2 quarters]` },
           ],
         },
       },
-      h("Highlights"),
-      {
-        type: "orderedList",
-        attrs: { start: 1 },
-        content: [
-          item("Lead with the headline.", "Follow with one or two sentences of supporting context."),
-          item("Second highlight.", "Explain what changed and why it matters."),
-          item("Third highlight.", "Note any next steps or expected timing."),
-        ],
-      },
+
+      h("Commercial"),
+      p(t("Research collaborations", ["bold"])),
+      bullets(
+        [prompt("one full-sentence claim, such as a contract signed, renewed or expanded. Then one or two sentences on why it matters. Describe partners by type and size, never by name.")],
+        [prompt("next development with a partner, with value or timing where you can share it.")],
+      ),
+      p(t("Products", ["bold"])),
+      bullets(
+        [prompt("product progress: trials, first sales, channel partners by geography. Say whether results are lab or field.")],
+      ),
+      p(
+        prompt("optional one-line summing up, for example how many paying partners you have and whether they're expanding."),
+      ),
+
+      h("R&D & Technology"),
+      p(prompt("program or platform name, such as a product, Formulation or CinThesis")),
+      p(
+        prompt("what you found or built. Define any technical term at first use in a parenthesis, give the number, then the commercial \"so what\". Hedge preliminary data plainly: \"the data is not conclusive, but it supports...\""),
+      ),
+      bullets(
+        [prompt("result with a number, for example a cost, speed or potency change against a stated baseline.")],
+        [prompt("result with a number.")],
+      ),
+
       h("Lowlights"),
-      {
-        type: "orderedList",
-        attrs: { start: 1 },
-        content: [
-          item("Be candid about setbacks.", "Describe the issue and how the team is responding."),
-          item("Second lowlight.", "Keep it brief and factual."),
-        ],
-      },
+      bullets(
+        [prompt("what slipped, in one plain sentence. Then why, and what changes as a result.")],
+        [prompt("a risk investors should know about, such as concentration, timing or supply, and the response.")],
+      ),
     ],
   };
 }
 
-/** Optional sections offered from the editor's insert menu. */
+/** Optional sections in the same voice, for updates that need them. */
 export const OPTIONAL_SECTIONS: { id: string; label: string; blocks: BlockNode[] }[] = [
   {
-    id: "scientific",
-    label: "Scientific developments",
-    blocks: [h("Scientific developments"), p(t("Summarise research progress at a level suitable for investors."))],
-  },
-  {
-    id: "commercial",
-    label: "Commercial developments",
-    blocks: [h("Commercial developments"), p(t("Summarise partnerships, contracts and pipeline changes."))],
-  },
-  {
-    id: "financial",
-    label: "Financial update",
-    blocks: [h("Financial update"), p(t("Summarise revenue, burn and runway using approved figures only."))],
-  },
-  {
-    id: "milestones",
-    label: "Milestones",
+    id: "asks",
+    label: "Asks",
     blocks: [
-      h("Milestones"),
-      {
-        type: "bulletList",
-        content: [
-          { type: "listItem", content: [p(t("Upcoming milestone and target timing."))] },
-          { type: "listItem", content: [p(t("Upcoming milestone and target timing."))] },
-        ],
-      },
+      h("Asks"),
+      bullets([prompt("specific help you want from investors, such as an introduction to a role at a type of company, or expertise in a named area.")]),
     ],
   },
   {
-    id: "closing",
-    label: "Closing message",
-    blocks: [h("Closing"), p(t("Thank investors and note how to get in touch with questions."))],
+    id: "fundraising",
+    label: "Fundraising",
+    blocks: [
+      p(t("Fundraising", ["bold"])),
+      p(prompt("the round size and type, the three uses of funds, and one clear next step with a link to the deck or a booking page.")),
+    ],
+  },
+  {
+    id: "founder-note",
+    label: "Founder note",
+    blocks: [p(prompt("a short first-person note, for example a change in cadence or a personal thank-you. Keep it to three sentences."))],
+  },
+  {
+    id: "platform-metrics",
+    label: "Platform metrics",
+    blocks: [
+      p(t("CinThesis", ["bold"])),
+      bullets(
+        [t("Cost per candidate: "), prompt("change vs. last quarter")],
+        [t("Time to candidate: "), prompt("change vs. last quarter")],
+        [t("Genomes run to date: "), prompt("count")],
+      ),
+    ],
+  },
+  {
+    id: "thanks",
+    label: "Thanks",
+    blocks: [
+      h("Thanks"),
+      p(prompt("name each person, with their permission, and the specific help they gave.")),
+    ],
   },
 ];
+
+/** Count unfilled `[Write: …]` prompts in a string (overlapping markers are not double-counted). */
+export function countPromptMarkers(text: string): number {
+  let count = 0;
+  for (let i = text.indexOf(PROMPT_OPEN); i !== -1; i = text.indexOf(PROMPT_OPEN, i + PROMPT_OPEN.length)) count++;
+  return count;
+}
+
+/** Number of unfilled template prompts anywhere in a document, including metric values. */
+export function templatePromptCount(doc: unknown): number {
+  let count = 0;
+  const walk = (nodes: unknown[] | undefined) => {
+    for (const n of nodes ?? []) {
+      if (!n || typeof n !== "object") continue;
+      const node = n as {
+        type?: string;
+        text?: string;
+        attrs?: { items?: { value?: string }[] };
+        content?: unknown[];
+      };
+      if (node.type === "text" && typeof node.text === "string") count += countPromptMarkers(node.text);
+      if (node.type === "metrics" && Array.isArray(node.attrs?.items)) {
+        for (const item of node.attrs.items) {
+          if (typeof item?.value === "string") count += countPromptMarkers(item.value);
+        }
+      }
+      if (Array.isArray(node.content)) walk(node.content);
+    }
+  };
+  if (doc && typeof doc === "object" && (doc as { type?: string }).type === "doc") {
+    walk((doc as DocNode).content);
+  } else {
+    // Fallback for malformed input (e.g. in tests with partial docs).
+    count = countPromptMarkers(JSON.stringify(doc ?? null));
+  }
+  return count;
+}
