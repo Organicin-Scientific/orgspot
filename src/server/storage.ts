@@ -24,8 +24,16 @@ export async function storageProblem(): Promise<string | null> {
   try {
     const [exists] = await bucket().exists();
     if (!exists) problem = STORAGE_DISABLED_MESSAGE;
-  } catch {
-    problem = STORAGE_DISABLED_MESSAGE;
+  } catch (err) {
+    // Only a missing bucket means Storage is not enabled. Anything else (permissions, bad
+    // credentials, network) is reported as such so the fix points at the real cause.
+    if (isStorageDisabledError(err)) {
+      problem = STORAGE_DISABLED_MESSAGE;
+    } else {
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error("Storage probe failed:", detail);
+      problem = `Could not reach Firebase Storage bucket "${env().FIREBASE_STORAGE_BUCKET}". Check that the service account has access to it. (${detail.slice(0, 200)})`;
+    }
   }
   storageProbe = { checkedAt: now, problem };
   return problem;
