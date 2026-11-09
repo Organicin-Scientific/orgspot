@@ -4,10 +4,45 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { AssetMeta } from "@/lib/types";
 import { env } from "./env";
 import { bucket, db } from "./firebase-admin";
-import { badRequest } from "./http/errors";
+import { badRequest, serviceUnavailable } from "./http/errors";
 import { chunk, data, isoRequired, num, str } from "./db/convert";
 
 export const assetsCol = () => db().collection("assets");
+
+let storageProbe: { checkedAt: number; problem: string | null } | null = null;
+const STORAGE_PROBE_MS = 60_000;
+
+const STORAGE_DISABLED_MESSAGE =
+  "Firebase Storage is not enabled for this project. Upgrade Firebase to Blaze, create the default Storage bucket, then try again.";
+
+/** Null when uploads and campaign snapshots are expected to work. Cached briefly to avoid hammering GCS. */
+export async function storageProblem(): Promise<string | null> {
+  if (env().usesEmulators) return null;
+  const now = Date.now();
+  if (storageProbe && now - storageProbe.checkedAt < STORAGE_PROBE_MS) return storageProbe.problem;
+  let problem: string | null = null;
+  try {
+    const [exists] = await bucket().exists();
+    if (!exists) problem = STORAGE_DISABLED_MESSAGE;
+  } catch {
+    problem = STORAGE_DISABLED_MESSAGE;
+  }
+  storageProbe = { checkedAt: now, problem };
+  return problem;
+}
+
+async function requireStorage() {
+  const problem = await storageProblem();
+  if (problem) throw serviceUnavailable(problem);
+}
+
+export function isStorageDisabledError(err: unknown): boolean {
+  if (err && typeof err === "object" && "code" in err) {
+    const code = String((err as { code: unknown }).code);
+    if (code === "404" || code === "storage/not-found" || code === "storage/bucket-not-found") return true;
+  }
+  return false;
+}
 
 const IMAGE_TYPES: Record<string, { ext: string; magic: (b: Buffer) => boolean }> = {
   "image/png": { ext: "png", magic: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
@@ -34,6 +69,7 @@ export function detectImageType(buf: Buffer, declared: string): string | null {
 }
 
 export async function uploadImage(file: File, actor: string): Promise<AssetMeta> {
+  await requireStorage();
   if (file.size === 0) throw badRequest("The file is empty");
   if (file.size > MAX_IMAGE_BYTES) throw badRequest("Images must be 5 MB or smaller");
   const buf = Buffer.from(await file.arrayBuffer());
@@ -74,6 +110,7 @@ export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 /** Supporting documents are never attached directly; recipients get expiring signed links. */
 export async function uploadAttachment(file: File, actor: string): Promise<AssetMeta> {
+  await requireStorage();
   if (file.size === 0) throw badRequest("The file is empty");
   if (file.size > MAX_ATTACHMENT_BYTES) throw badRequest("Documents must be 20 MB or smaller");
   const type = ATTACHMENT_TYPES[file.type];
@@ -133,6 +170,7 @@ export async function readFile(path: string): Promise<Buffer> {
 }
 
 export async function writeFile(path: string, content: Buffer | string, contentType: string) {
+  await requireStorage();
   await bucket().file(path).save(typeof content === "string" ? Buffer.from(content, "utf8") : content, {
     contentType,
     resumable: false,

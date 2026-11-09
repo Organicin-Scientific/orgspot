@@ -201,7 +201,12 @@ export function ImportWizard({ groups }: { groups: InvestorGroup[] }) {
           </Alert>
         )}
 
-        {step === 0 && <UploadStep busy={busy} onFile={upload} />}
+        {step === 0 && (
+          <>
+            <UploadStep busy={busy} onFile={upload} />
+            <ImportHelpCard />
+          </>
+        )}
 
         {step === 1 && parsed && (
           <MappingStep
@@ -257,6 +262,54 @@ export function ImportWizard({ groups }: { groups: InvestorGroup[] }) {
         )}
       </PageBody>
     </>
+  );
+}
+
+function ImportHelpCard() {
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-base">Preparing your file</CardTitle>
+        <CardDescription>
+          Import only updates contacts in this app. No email is sent. Rows on the global suppression list are added as unsubscribed or bounced and will not
+          receive future campaigns.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <div>
+          <p className="font-medium text-foreground">Accepted formats</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            <li>
+              <strong className="font-medium text-foreground">CSV or .xlsx</strong> with a header row (max {formatNumber(MAX_IMPORT_ROWS)} data rows per file).
+            </li>
+            <li>
+              At minimum map one column to <strong className="font-medium text-foreground">Email address</strong>. Optional: first/last name (or full name),
+              organization, category, notes.
+            </li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-medium text-foreground">HubSpot</p>
+          <p className="mt-1">
+            Contacts → select records → Export → CSV. Typical columns <code className="rounded bg-muted px-1 font-mono text-xs">Email</code>,{" "}
+            <code className="rounded bg-muted px-1 font-mono text-xs">First Name</code>,{" "}
+            <code className="rounded bg-muted px-1 font-mono text-xs">Last Name</code>,{" "}
+            <code className="rounded bg-muted px-1 font-mono text-xs">Company name</code> are mapped automatically.
+          </p>
+        </div>
+        <div>
+          <p className="font-medium text-foreground">Google Contacts</p>
+          <p className="mt-1">
+            contacts.google.com → Export → Google CSV. The column{" "}
+            <code className="rounded bg-muted px-1 font-mono text-xs">E-mail 1 - Value</code> is recognised for email.
+          </p>
+        </div>
+        <p>
+          Gmail does not export mailing lists directly; use Google Contacts or copy addresses into a spreadsheet with an <code className="font-mono text-xs">email</code>{" "}
+          column. .xls and Google Sheets must be saved as .xlsx or CSV first.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

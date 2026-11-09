@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { AppSettings } from "@/lib/types";
 import { env } from "../env";
 import { db } from "../firebase-admin";
+import { storageProblem } from "../storage";
 import { iso, str } from "./convert";
 
 export const DEFAULT_BRAND_COLOR = "#1f6f5c";
@@ -85,5 +86,13 @@ export function sendReadiness(s: AppSettings): SendReadiness {
   if (env().SENDER_EMAIL && s.sender.fromEmail && s.sender.fromEmail.toLowerCase().split("@")[1] !== env().SENDER_EMAIL!.toLowerCase().split("@")[1]) {
     problems.push("Sender email must use the verified sending domain configured for this environment.");
   }
+  return { ready: problems.length === 0, problems };
+}
+
+/** Sender/footer checks plus infrastructure required before test or live sends. */
+export async function fullSendReadiness(s: AppSettings): Promise<SendReadiness> {
+  const base = sendReadiness(s);
+  const storage = await storageProblem();
+  const problems = storage ? [...base.problems, storage] : base.problems;
   return { ready: problems.length === 0, problems };
 }

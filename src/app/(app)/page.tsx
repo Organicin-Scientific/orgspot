@@ -9,7 +9,7 @@ import { formatDate, formatNumber, relativeTime } from "@/lib/format";
 import { recentSentCampaigns } from "@/server/campaigns/repo";
 import { recentActivity } from "@/server/db/activity";
 import { countInvestors } from "@/server/db/investors";
-import { getSettings, sendReadiness } from "@/server/db/settings";
+import { fullSendReadiness, getSettings } from "@/server/db/settings";
 import { countUpdates, listUpdates } from "@/server/db/updates";
 
 export const metadata = { title: "Dashboard" };
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   ]);
   const last = campaigns[0] ?? null;
   const lastRates = last ? campaignRates(last.stats) : null;
-  const readiness = sendReadiness(settings);
+  const readiness = await fullSendReadiness(settings);
 
   return (
     <>

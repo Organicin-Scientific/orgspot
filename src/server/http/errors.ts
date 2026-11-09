@@ -20,3 +20,5 @@ export const tooManyRequests = (message = "Too many requests. Please wait and tr
   new ApiError(429, "rate_limited", message);
 export const precondition = (message: string, details?: unknown) =>
   new ApiError(412, "precondition_failed", message, details);
+export const serviceUnavailable = (message: string, details?: unknown) =>
+  new ApiError(503, "service_unavailable", message, details);

@@ -9,7 +9,7 @@ import { audit } from "../audit";
 import { chunk } from "../db/convert";
 import { iterateInvestors } from "../db/investors";
 import { getGroup } from "../db/groups";
-import { getSettings, sendReadiness } from "../db/settings";
+import { fullSendReadiness, getSettings } from "../db/settings";
 import { suppressedSet } from "../db/suppression";
 import { getUpdate, updatesCol } from "../db/updates";
 import { emailProvider } from "../email";
@@ -134,7 +134,7 @@ export async function prepareCampaign(updateId: string, sel: AudienceSelection, 
   if (!update.subject.trim()) throw precondition("Add an email subject before preparing a send.");
 
   const settings = await getSettings();
-  const readiness = sendReadiness(settings);
+  const readiness = await fullSendReadiness(settings);
   if (!readiness.ready) throw precondition(readiness.problems[0], { problems: readiness.problems });
   const domainProblem = await senderDomainCheck(settings.sender.fromEmail);
   if (domainProblem) throw precondition(domainProblem);
