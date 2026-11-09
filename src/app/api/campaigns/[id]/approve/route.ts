@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { approveCampaign } from "@/server/campaigns/approve";
-import { runWorker } from "@/server/campaigns/worker";
+import { drainSendQueue } from "@/server/campaigns/worker";
 import { ok, readJson, withAdmin } from "@/server/http/handler";
 import { approveInput } from "@/server/http/schemas";
 import { log } from "@/server/logger";
@@ -17,7 +17,7 @@ export const POST = withAdmin<{ id: string }>(
     const result = await approveCampaign(params.id, snapshotHash, session.email);
     after(async () => {
       try {
-        await runWorker(45_000);
+        await drainSendQueue(55_000);
       } catch (err) {
         log.error("worker.after_approve_failed", { err });
       }

@@ -5,7 +5,7 @@ test.describe("update editor and sandbox send", () => {
     test.setTimeout(120_000);
     await page.goto("/");
     await page.getByRole("button", { name: "New Update" }).click();
-    await expect(page).toHaveURL(/\/updates\/[a-zA-Z0-9_-]+$/);
+    await expect(page).toHaveURL(/\/updates\/[a-zA-Z0-9_-]+$/, { timeout: 30_000 });
 
     await page.getByRole("textbox", { name: "Update title" }).fill("E2E synthetic update");
     await page.locator(".ProseMirror").click();
@@ -35,7 +35,8 @@ test.describe("update editor and sandbox send", () => {
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: "Review & send" }).click();
-    await expect(page.getByRole("heading", { name: "Review and send", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/\/send$/, { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Review and send", level: 1 })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole("checkbox", { name: /^Board/ }).click();
     await page.getByRole("button", { name: /Prepare review/ }).click();

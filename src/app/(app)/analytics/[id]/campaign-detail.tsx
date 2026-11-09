@@ -49,6 +49,7 @@ export function CampaignDetail({ initial }: { initial: Campaign }) {
   const inProgress = ACTIVE.has(c.status);
 
   const [tick, setTick] = useState(0);
+  const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +66,19 @@ export function CampaignDetail({ initial }: { initial: Campaign }) {
     const t = setInterval(() => setTick((n) => n + 1), 5000);
     return () => clearInterval(t);
   }, [inProgress]);
+
+  async function resumeSending() {
+    setResuming(true);
+    try {
+      await api("/api/internal/worker", { method: "POST", body: {} });
+      setTick((n) => n + 1);
+      toast.success("Send queue processed");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setResuming(false);
+    }
+  }
 
   const processed = s.accepted + s.failed + s.skipped;
   const progress = s.eligible ? Math.round((processed / s.eligible) * 100) : 0;
@@ -117,7 +131,14 @@ export function CampaignDetail({ initial }: { initial: Campaign }) {
                 </span>
               </div>
               <Progress value={progress} aria-label="Send progress" />
-              <p className="text-xs text-muted-foreground">You can leave this page; sending continues in the background.</p>
+              <p className="text-xs text-muted-foreground">
+                Sending starts when you approve. Large lists may need another pass—use Continue sending or wait for the daily worker if
+                progress stalls.
+              </p>
+              <Button variant="outline" size="sm" onClick={resumeSending} disabled={resuming}>
+                {resuming ? <Loader2 className="animate-spin" /> : null}
+                Continue sending
+              </Button>
             </CardContent>
           </Card>
         )}

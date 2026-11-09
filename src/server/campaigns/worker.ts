@@ -370,3 +370,19 @@ export async function runWorker(budgetMs = 50_000): Promise<WorkerResult> {
   }
   return { jobsProcessed, sent, remaining };
 }
+
+/** Run the worker repeatedly until the queue is idle or the wall-clock budget is spent. */
+export async function drainSendQueue(budgetMs: number): Promise<WorkerResult> {
+  const deadline = Date.now() + budgetMs;
+  const total: WorkerResult = { jobsProcessed: 0, sent: 0, remaining: false };
+  while (Date.now() < deadline) {
+    const slice = Math.min(50_000, deadline - Date.now());
+    if (slice < 2_000) break;
+    const r = await runWorker(slice);
+    total.jobsProcessed += r.jobsProcessed;
+    total.sent += r.sent;
+    if (!r.remaining) return { ...total, remaining: false };
+    total.remaining = true;
+  }
+  return total;
+}

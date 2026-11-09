@@ -93,10 +93,14 @@ Use `list` and `remove` per the script header in `scripts/admin.ts`.
 
 ## Vercel Cron
 
-`vercel.json` schedules a cron job every minute:
+`vercel.json` schedules a **once-daily** cron (Hobby plan limit), at **11:00 UTC** (~6:00 US Eastern):
 
 - **Path:** `GET /api/internal/worker`
 - **Authorisation:** `Authorization: Bearer <CRON_SECRET>` (compare `src/app/api/internal/worker/route.ts`)
+
+Approving a campaign still starts sending immediately in the API handler (`after()` drain). The cron is for recovery, retries, and any backlog if a run was interrupted.
+
+Admins can also **POST** `/api/internal/worker` (session + CSRF) from the campaign analytics page to continue a large send without waiting for cron.
 
 Set `CRON_SECRET` in Vercel (production) to a long random value and match it in the platform’s cron secret configuration if applicable.
 
