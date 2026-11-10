@@ -141,7 +141,7 @@ export function UpNextPanel({
               <span className="tabular-nums">{Math.round(progress * 100)}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-brand transition-transform duration-300" style={{ width: `${progress * 100}%` }} />
+              <div className="h-full origin-left rounded-full bg-brand transition-transform duration-200 ease-(--ease-out)" style={{ transform: `scaleX(${progress})` }} />
             </div>
           </div>
         )}

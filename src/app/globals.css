@@ -149,6 +149,7 @@
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Staggered entrance for dashboard panels. Set --i on each panel (0, 1, 2…). */
@@ -166,12 +167,12 @@
 /* Bars grow from their start edge on first paint. */
 .dash-bar {
   transform-origin: left center;
-  animation: dash-bar 520ms var(--ease-out) both;
+  animation: dash-bar 360ms var(--ease-out) both;
   animation-delay: calc(120ms + var(--i, 0) * 60ms);
 }
 .dash-bar-v {
   transform-origin: center bottom;
-  animation: dash-bar-v 480ms var(--ease-out) both;
+  animation: dash-bar-v 340ms var(--ease-out) both;
   animation-delay: calc(120ms + var(--i, 0) * 40ms);
 }
 @keyframes dash-bar {
