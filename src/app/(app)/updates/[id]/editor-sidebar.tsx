@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FileText, History, ImagePlus, Loader2, Paperclip, RotateCcw, X } from "lucide-react";
+import { FileText, History, ImagePlus, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorMessage } from "@/lib/api-client";
-import { formatBytes, formatDateTime } from "@/lib/format";
+import type { DocNode } from "@/lib/content/schema";
+import { formatDateTime } from "@/lib/format";
 import type { AssetMeta, PdfDelivery, UpdateDoc, UpdateRevision } from "@/lib/types";
+import { AssistantPanel } from "./assistant-panel";
 
 export interface Meta {
   title: string;
@@ -20,7 +22,6 @@ export interface Meta {
   previewText: string;
   pdfDelivery: PdfDelivery;
   bannerAssetId: string | null;
-  attachmentIds: string[];
 }
 
 const PDF_OPTIONS: { value: PdfDelivery; label: string; help: string }[] = [
@@ -28,6 +29,14 @@ const PDF_OPTIONS: { value: PdfDelivery; label: string; help: string }[] = [
   { value: "link", label: "Link to PDF", help: "A personal download link that expires. Keeps the email small." },
   { value: "none", label: "No PDF", help: "Email body only." },
 ];
+
+export interface AssistantBridge {
+  enabled: boolean;
+  getContent: () => DocNode;
+  beforeSend: () => Promise<boolean>;
+  onWorkingChange: (working: boolean) => void;
+  onApply: (content: DocNode) => Promise<void>;
+}
 
 export function EditorSidebar({
   updateId,
@@ -37,6 +46,7 @@ export function EditorSidebar({
   onRestored,
   versionRef,
   beforeRestore,
+  assistant,
 }: {
   updateId: string;
   meta: Meta;
@@ -45,11 +55,16 @@ export function EditorSidebar({
   onRestored: (u: UpdateDoc) => void;
   versionRef: React.RefObject<number>;
   beforeRestore: () => Promise<boolean>;
+  assistant: AssistantBridge;
 }) {
+  const [tab, setTab] = useState(editable ? "assistant" : "email");
   return (
-    <aside className="w-full shrink-0 border-t bg-background lg:sticky lg:top-[53px] lg:h-[calc(100svh-53px)] lg:w-80 lg:overflow-y-auto lg:border-t-0 lg:border-l">
-      <Tabs defaultValue="email" className="gap-0">
-        <TabsList className="m-3 grid w-[calc(100%-1.5rem)] grid-cols-2">
+    <aside className="flex w-full shrink-0 flex-col border-t bg-background lg:sticky lg:top-[53px] lg:h-[calc(100svh-53px)] lg:w-96 lg:border-t-0 lg:border-l">
+      <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
+        <TabsList className="m-3 grid w-[calc(100%-1.5rem)] shrink-0 grid-cols-3">
+          <TabsTrigger value="assistant">
+            <Sparkles /> Assistant
+          </TabsTrigger>
           <TabsTrigger value="email">
             <FileText /> Email
           </TabsTrigger>
@@ -57,10 +72,14 @@ export function EditorSidebar({
             <History /> History
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="email" className="space-y-6 px-4 pb-8">
+        {/* forceMount keeps the conversation and any half-typed message when switching tabs. */}
+        <TabsContent value="assistant" forceMount className="flex h-[70svh] min-h-0 flex-col data-[state=inactive]:hidden lg:h-auto lg:flex-1">
+          <AssistantPanel updateId={updateId} editable={editable} {...assistant} />
+        </TabsContent>
+        <TabsContent value="email" className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 pb-8">
           <EmailFields meta={meta} editable={editable} onChange={onChange} />
         </TabsContent>
-        <TabsContent value="history" className="px-4 pb-8">
+        <TabsContent value="history" className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
           <Revisions updateId={updateId} editable={editable} onRestored={onRestored} versionRef={versionRef} beforeRestore={beforeRestore} />
         </TabsContent>
       </Tabs>
@@ -69,32 +88,17 @@ export function EditorSidebar({
 }
 
 function EmailFields({ meta, editable, onChange }: { meta: Meta; editable: boolean; onChange: (patch: Partial<Meta>) => void }) {
-  const [known, setKnown] = useState<AssetMeta[]>([]);
-  const [uploading, setUploading] = useState<"banner" | "attachment" | null>(null);
+  const [uploading, setUploading] = useState<"banner" | null>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
-  const attachInput = useRef<HTMLInputElement>(null);
-  const attachments = meta.attachmentIds.map((id) => known.find((a) => a.id === id)).filter((a): a is AssetMeta => !!a);
-  const missingKey = meta.attachmentIds.filter((id) => !known.some((a) => a.id === id)).join(",");
 
-  useEffect(() => {
-    if (!missingKey) return;
-    api<AssetMeta[]>(`/api/assets?ids=${encodeURIComponent(missingKey)}`)
-      .then((found) => setKnown((k) => [...k, ...found.filter((f) => !k.some((x) => x.id === f.id))]))
-      .catch(() => undefined);
-  }, [missingKey]);
-
-  async function upload(file: File, kind: "banner" | "attachment") {
+  async function upload(file: File, kind: "banner") {
     setUploading(kind);
     try {
       const form = new FormData();
       form.set("file", file);
-      form.set("kind", kind === "banner" ? "image" : "attachment");
+      form.set("kind", "image");
       const asset = await api<AssetMeta>("/api/assets", { form });
-      if (kind === "banner") onChange({ bannerAssetId: asset.id });
-      else {
-        setKnown((a) => [...a, asset]);
-        onChange({ attachmentIds: [...meta.attachmentIds, asset.id] });
-      }
+      onChange({ bannerAssetId: asset.id });
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -179,51 +183,6 @@ function EmailFields({ meta, editable, onChange }: { meta: Meta; editable: boole
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label>Additional files</Label>
-        <input
-          ref={attachInput}
-          type="file"
-          accept=".pdf,.docx,.xlsx,.pptx"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void upload(f, "attachment");
-            e.target.value = "";
-          }}
-        />
-        {attachments.length > 0 && (
-          <ul className="space-y-1">
-            {attachments.map((a) => (
-              <li key={a.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
-                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{a.filename}</span>
-                <span className="text-xs text-muted-foreground">{formatBytes(a.size)}</span>
-                {editable && (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Remove ${a.filename}`}
-                    onClick={() => onChange({ attachmentIds: meta.attachmentIds.filter((x) => x !== a.id) })}
-                  >
-                    <X />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => attachInput.current?.click()}
-          disabled={!editable || !!uploading || meta.attachmentIds.length >= 10}
-        >
-          {uploading === "attachment" ? <Loader2 className="animate-spin" /> : <Paperclip />} Add file
-        </Button>
-        <p className="text-xs text-muted-foreground">Shared as personal download links. PDF, Word, Excel or PowerPoint, up to 20 MB.</p>
-      </div>
     </>
   );
 }

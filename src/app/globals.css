@@ -351,3 +351,34 @@
 .doc-page .ProseMirror-gapcursor:after {
   border-top-color: var(--doc-text);
 }
+/* Assistant "Drafting" label: a light sweep across the text while Gemini works.
+   Constant motion, so linear; replaced by a steady label under reduced motion. */
+.assistant-thinking {
+  background: linear-gradient(
+      90deg,
+      var(--muted-foreground) 0%,
+      var(--muted-foreground) 40%,
+      var(--foreground) 50%,
+      var(--muted-foreground) 60%,
+      var(--muted-foreground) 100%
+    )
+    0 0 / 250% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: assistant-sweep 1.6s linear infinite;
+}
+@keyframes assistant-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-thinking {
+    animation: none;
+    color: var(--muted-foreground);
+    background: none;
+  }
+}

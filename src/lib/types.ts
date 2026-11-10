@@ -98,6 +98,19 @@ export interface UpdateRevision {
   createdAt: ISODate;
 }
 
+/** One turn of the drafting assistant conversation saved with an update. */
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  /** Name of a document attached to a user turn. The file itself is not stored. */
+  fileName: string | null;
+  /** For assistant turns: what changed in the update, e.g. "Filled 9 prompts, edited 2 blocks". */
+  changeSummary: string | null;
+  createdBy: string;
+  createdAt: ISODate;
+}
+
 export interface CampaignStats {
   selected: number;
   eligible: number;

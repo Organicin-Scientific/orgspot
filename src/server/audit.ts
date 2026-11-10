@@ -24,6 +24,8 @@ export type AuditAction =
   | "update.restore"
   | "update.test_send"
   | "update.ai_draft"
+  | "update.assistant"
+  | "update.assistant_clear"
   | "campaign.prepare"
   | "campaign.cancel"
   | "campaign.approve"

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import DOMPurify from "dompurify";
-import { AlertTriangle, Check, ChevronLeft, Copy, Eye, GripVertical, Loader2, Send, SendHorizonal, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, Copy, Eye, GripVertical, Loader2, Send, SendHorizonal } from "lucide-react";
 import { toast } from "sonner";
 import { editorExtensions } from "@/components/editor/extensions";
 import { EditorToolbar } from "@/components/editor/toolbar";
@@ -17,9 +17,8 @@ import type { DocNode } from "@/lib/content/schema";
 import { relativeTime } from "@/lib/format";
 import type { Branding, PdfDelivery, UpdateDoc } from "@/lib/types";
 import { BlocksMenuItems, SaveBlockDialog, useReusableBlocks } from "./blocks";
-import { EditorSidebar, type Meta } from "./editor-sidebar";
+import { EditorSidebar, type AssistantBridge, type Meta } from "./editor-sidebar";
 import { PreviewDialog } from "./preview-dialog";
-import { AiDraftDialog } from "./ai-draft-dialog";
 import { TestSendDialog } from "./test-send-dialog";
 import { DEFAULT_LOGO_PATH, editorFontStack } from "@/lib/brand";
 
@@ -52,14 +51,13 @@ export function UpdateEditor({
     previewText: initial.previewText,
     pdfDelivery: initial.pdfDelivery,
     bannerAssetId: initial.bannerAssetId,
-    attachmentIds: initial.attachmentIds,
   });
   const [status, setStatus] = useState(initial.status);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [savedAt, setSavedAt] = useState(initial.updatedAt);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
-  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [assistantWorking, setAssistantWorking] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [saveBlockOpen, setSaveBlockOpen] = useState(false);
   const reusable = useReusableBlocks();
@@ -196,7 +194,6 @@ export function UpdateEditor({
       previewText: u.previewText,
       pdfDelivery: u.pdfDelivery as PdfDelivery,
       bannerAssetId: u.bannerAssetId,
-      attachmentIds: u.attachmentIds,
     };
     metaRef.current = m;
     setMeta(m);
@@ -206,6 +203,33 @@ export function UpdateEditor({
     setSavedAt(u.updatedAt);
     setStatus(u.status);
   }
+
+  // The assistant edits the document directly. While a turn is running the editor is
+  // read-only, so nothing typed in the meantime is overwritten by the reply. A manual
+  // revision before and after each change gives History a clean point to restore.
+  const assistant: AssistantBridge = {
+    enabled: aiDraftEnabled,
+    getContent: () => (editorRef.current?.getJSON() ?? initial.content) as DocNode,
+    beforeSend: async () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      await save("autosave");
+      return !dirtyRef.current && !conflictRef.current;
+    },
+    onWorkingChange: (working) => {
+      setAssistantWorking(working);
+      editorRef.current?.setEditable(!working && editable, false);
+    },
+    onApply: async (content) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      await save("manual", { silent: true });
+      ed.commands.setContent(content, { emitUpdate: false });
+      dirtyRef.current = true;
+      setSaveState("dirty");
+      await save("manual", { silent: true });
+    },
+  };
 
   const docStyle = {
     "--doc-brand": branding.primaryColor,
@@ -238,17 +262,6 @@ export function UpdateEditor({
           </Button>
           {editable ? (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  await flush();
-                  setAiDraftOpen(true);
-                }}
-                title={aiDraftEnabled ? "Fill template prompts with Gemini" : "Enable AI drafting in server settings"}
-              >
-                <Sparkles /> Draft with AI
-              </Button>
               <Button variant="outline" size="sm" onClick={async () => { await flush(); setTestOpen(true); }}>
                 <SendHorizonal /> Send test
               </Button>
@@ -302,7 +315,11 @@ export function UpdateEditor({
               />
             </div>
           )}
-          <article className="doc-page mx-auto mt-3 max-w-[760px] rounded-sm border border-black/5 shadow-sm" style={docStyle}>
+          <article
+            className={`doc-page mx-auto mt-3 max-w-[760px] rounded-sm border border-black/5 shadow-sm transition-opacity duration-200 ease-out ${assistantWorking ? "opacity-60" : ""}`}
+            style={docStyle}
+            aria-busy={assistantWorking}
+          >
             <div className="px-6 pt-10 pb-4 text-center sm:px-14">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -341,6 +358,7 @@ export function UpdateEditor({
           onChange={updateMeta}
           onRestored={applyRestored}
           versionRef={versionRef}
+          assistant={assistant}
           beforeRestore={async () => {
             if (timerRef.current) clearTimeout(timerRef.current);
             await save("manual", { silent: true });
@@ -352,19 +370,6 @@ export function UpdateEditor({
       <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} updateId={initial.id} meta={meta} getContent={() => (editor?.getJSON() ?? initial.content) as DocNode} />
       {editor && <SaveBlockDialog open={saveBlockOpen} onOpenChange={setSaveBlockOpen} editor={editor} onSaved={reusable.add} />}
       <TestSendDialog open={testOpen} onOpenChange={setTestOpen} updateId={initial.id} defaultEmail={adminEmail} liveSending={liveSending} />
-      <AiDraftDialog
-        open={aiDraftOpen}
-        onOpenChange={setAiDraftOpen}
-        updateId={initial.id}
-        enabled={aiDraftEnabled}
-        getContent={() => (editor?.getJSON() ?? initial.content) as DocNode}
-        onApply={(content) => {
-          editor?.commands.setContent(content, { emitUpdate: true });
-          dirtyRef.current = true;
-          setSaveState("dirty");
-          void save("manual", { silent: true });
-        }}
-      />
     </div>
   );
 }

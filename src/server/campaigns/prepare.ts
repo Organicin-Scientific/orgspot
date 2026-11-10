@@ -18,7 +18,7 @@ import { renderUpdatePdf } from "../email/pdf";
 import { GMAIL_CLIP_BYTES, renderUpdateEmail } from "../email/render";
 import { db } from "../firebase-admin";
 import { badRequest, conflict, notFound, precondition } from "../http/errors";
-import { getAssets, writeFile } from "../storage";
+import { writeFile, type StoredAsset } from "../storage";
 import { campaignsCol, recipientsCol, snapshotPaths } from "./repo";
 
 export const MAX_RECIPIENTS = 10_000;
@@ -152,7 +152,8 @@ export async function prepareCampaign(updateId: string, sel: AudienceSelection, 
     throw precondition(`Campaigns are limited to ${MAX_RECIPIENTS.toLocaleString()} recipients.`);
   }
 
-  const attachments = (await getAssets(update.attachmentIds)).filter((a) => a.kind === "attachment");
+  // Updates no longer carry extra files; the PDF copy is the only attachment.
+  const attachments: StoredAsset[] = [];
   const rendered = await renderUpdateEmail({
     title: update.title,
     subject: update.subject,

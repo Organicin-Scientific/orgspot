@@ -78,6 +78,10 @@ Email/update drafts and sent records.
 
 **Subcollection:** `updates/{id}/revisions` — autosave/manual/restore snapshots (`title`, `subject`, `previewText`, `content`, `version`, `reason`, `createdBy`, `createdAt`).
 
+**Subcollection:** `updates/{id}/assistantMessages` — drafting assistant conversation (`role` `user` \| `assistant`, `text`, `fileName`, `changeSummary`, `createdBy`, `createdAt`). Deleted with the update and by **Clear** in the Assistant tab.
+
+`attachmentIds` is no longer set by the editor and is ignored when rendering, testing and sending; the PDF copy is the only attachment.
+
 ### `contentBlocks`
 
 Reusable content snippets.
