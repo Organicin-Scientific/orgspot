@@ -76,7 +76,7 @@ firebase deploy --only firestore:rules,firestore:indexes,storage --project <proj
 
 `next.config.ts` rewrites `/_/auth/*` to `https://<NEXT_PUBLIC_FIREBASE_PROJECT_ID>.firebaseapp.com/_/auth/*` so Firebase Auth can use your **app hostname** as `authDomain` and avoid third-party cookie issues.
 
-Set **`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`** to your deployed hostname (for example `updates.organicin.com`), not only the default `*.firebaseapp.com` domain, when following this pattern.
+Set **`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`** to your deployed hostname (for example `investor.organicinscientific.com`), not only the default `*.firebaseapp.com` domain, when following this pattern.
 
 ## First admin (Firestore allowlist)
 
@@ -109,13 +109,13 @@ When a run ends with recipients still queued, the worker starts a fresh invocati
 
 ### Frequent schedule via GitHub Actions
 
-The Hobby plan allows only a daily Vercel cron, and the worker moves any send interrupted for more than 23 hours to manual review. `.github/workflows/send-worker.yml` calls the worker every 10 minutes so retries run on time. To enable it, add a repository **variable** `ORGSPOT_URL` (for example `https://orgspot.vercel.app`) and a repository **secret** `CRON_SECRET` matching Vercel. The job is skipped until `ORGSPOT_URL` exists.
+The Hobby plan allows only a daily Vercel cron, and the worker moves any send interrupted for more than 23 hours to manual review. `.github/workflows/send-worker.yml` calls the worker every 10 minutes so retries run on time. To enable it, add a repository **variable** `ORGSPOT_URL` (for example `https://investor.organicinscientific.com`) and a repository **secret** `CRON_SECRET` matching Vercel. The job is skipped until `ORGSPOT_URL` exists.
 
 Set `CRON_SECRET` in Vercel (production) to a long random value and match it in the platform’s cron secret configuration if applicable.
 
 ## Resend
 
-1. Add a **dedicated sending subdomain** (for example `updates.organicin.com`) in Resend.
+1. Add a **dedicated sending subdomain** (for example `investor.organicinscientific.com`) in Resend.
 2. Add **SPF** and **DKIM** records Resend provides for that domain.
 3. Add **DMARC** for the subdomain (policy aligned with your security posture).
 4. Configure the **webhook** URL: `https://<your-app-domain>/api/webhooks/resend`.
