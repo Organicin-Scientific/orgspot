@@ -6,7 +6,7 @@ name: Send worker
 # turns ordinary transient failures into "needs review".
 #
 # Setup (repository Settings > Secrets and variables > Actions):
-#   variable ORGSPOT_URL   e.g. https://orgspot.vercel.app (no trailing slash)
+#   variable ORGSPOT_URL   e.g. https://investor.organicinscientific.com (no trailing slash)
 #   secret   CRON_SECRET   the same value as CRON_SECRET in Vercel production
 # The job is skipped until ORGSPOT_URL is set.
 
