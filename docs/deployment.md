@@ -46,6 +46,9 @@ Variables are defined in `.env.example` and validated in `src/server/env.ts`. Be
 | `CRON_SECRET` | Bearer for `/api/internal/worker` | Minimum 32 characters |
 | `TOKEN_SIGNING_SECRET` | HMAC for unsubscribe and file tokens | Minimum 32 characters |
 | `PDF_LINK_TTL_DAYS` | Expiry for signed download links | Default 30 |
+| `AI_DRAFT_ENABLED` | Vertex Gemini template drafting in the update editor | Default false; needs service account + Vertex AI API |
+| `GEMINI_MODEL` | Vertex model id | Default `gemini-3.8-flash` |
+| `VERTEX_GEMINI_LOCATION` | Vertex region | Default `us-central1` |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Client Firebase config | Public |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Client auth domain | Often set to the **app’s own domain** in production (see below) |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Client project id | Public |
@@ -124,6 +127,10 @@ Set `CRON_SECRET` in Vercel (production) to a long random value and match it in 
 
 `firebase-admin` pulls in `jwks-rsa`, which must load `jose` on Node without `NODE_OPTIONS=--experimental-require-module`. This repo pins **`jose@5.9.6`** under `jwks-rsa` via `package.json` `overrides` so session verification works on Vercel with Node 22.x. After deploying that change, **remove** the `NODE_OPTIONS=--experimental-require-module` production env var.
 
+## AI template drafting (Vertex)
+
+See [ai-drafting.md](ai-drafting.md). Requires Vertex AI API + `roles/aiplatform.user` on the Firebase Admin service account, and Vercel env `AI_DRAFT_ENABLED=true`.
+
 ## Pre-launch checklist
 
 - [ ] Production Firebase project isolated from dev/preview; Vercel Production env vars only on Production  
@@ -138,5 +145,6 @@ Set `CRON_SECRET` in Vercel (production) to a long random value and match it in 
 - [ ] `EMAIL_SENDING_ENABLED=true` **only** when deliberately enabling live send (plus `RESEND_API_KEY`)  
 - [ ] `CRON_SECRET` set on Vercel; cron hitting `/api/internal/worker` with Bearer auth  
 - [ ] `TOKEN_SIGNING_SECRET` and other secrets are strong and unique to production  
+- [ ] (Optional) Vertex AI enabled; `AI_DRAFT_ENABLED=true` and Gemini env vars on production  
 
 **Deploying to production and sending real email to investors must have explicit owner approval.** This document is operational guidance only, not authorisation to go live.
