@@ -57,7 +57,7 @@ export function starterDocument(): DocNode {
         attrs: {
           items: [
             { label: "Revenue YTD", sublabel: "cash received since Jan 1", value: `${PROMPT_OPEN}cash received YTD]` },
-            { label: "Receivables", sublabel: "invoiced, not yet paid", value: `${PROMPT_OPEN}open invoices]` },
+            { label: "Contracted backlog", sublabel: "signed, not yet collected", value: `${PROMPT_OPEN}uncollected contract value]` },
             { label: "Pipeline", sublabel: "proposed, not yet signed", value: `${PROMPT_OPEN}open proposals]` },
           ],
         },

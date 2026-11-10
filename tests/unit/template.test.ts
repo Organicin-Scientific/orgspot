@@ -53,7 +53,7 @@ describe("template prompts", () => {
       | undefined;
     expect(metrics?.attrs.items.map((i) => [i.label, i.sublabel])).toEqual([
       ["Revenue YTD", "cash received since Jan 1"],
-      ["Receivables", "invoiced, not yet paid"],
+      ["Contracted backlog", "signed, not yet collected"],
       ["Pipeline", "proposed, not yet signed"],
     ]);
   });

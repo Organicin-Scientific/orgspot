@@ -26,7 +26,7 @@ const doc: DocNode = {
     { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Commercial" }] },
     {
       type: "metrics",
-      attrs: { items: [{ label: "Receivables", sublabel: "invoiced, not yet paid", value: "$239K+" }, { label: "Pipeline", sublabel: "proposed, not yet signed", value: "$800K+" }] },
+      attrs: { items: [{ label: "Contracted backlog", sublabel: "signed, not yet collected", value: "$239K+" }, { label: "Pipeline", sublabel: "proposed, not yet signed", value: "$800K+" }] },
     },
     {
       type: "bulletList",
@@ -75,7 +75,7 @@ describe("brand defaults", () => {
     // Metrics strip: value first in tabular figures, on the tinted panel shared with the editor.
     expect(html).toContain("font-variant-numeric:tabular-nums");
     expect(html.toLowerCase()).toContain("#f6f8f7");
-    expect(html.indexOf("$239K+")).toBeLessThan(html.indexOf("Receivables"));
+    expect(html.indexOf("$239K+")).toBeLessThan(html.indexOf("Contracted backlog"));
     if (process.env.BRAND_HTML_OUT) (await import("node:fs")).writeFileSync(process.env.BRAND_HTML_OUT, html);
   });
 });
