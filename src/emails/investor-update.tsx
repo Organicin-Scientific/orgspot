@@ -27,6 +27,9 @@ export interface EmailModel {
 
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
+/** Matches the metric cards in the editor, so the draft and the sent email look alike. */
+const METRIC_BG = "#f6f8f7";
+const METRIC_BORDER = "#e3e8e6";
 
 interface Ctx {
   m: EmailModel;
@@ -104,45 +107,73 @@ function Table({ children, style, align }: { children: React.ReactNode; style?: 
 }
 
 function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
+  // Value first, then what it is, then how it's measured. A tinted panel with hairline
+  // dividers keeps the figures reading as one set, and tabular figures keep digits aligned
+  // when investors compare one quarter's strip with the last.
   const width = `${Math.floor(100 / items.length)}%`;
   const anySublabel = items.some((it) => it.sublabel);
   return (
-    <Table style={{ margin: "8px 0 22px" }}>
-      <tr>
-        {items.map((it, i) => (
-          <td key={i} width={width} valign="top" align="center" style={{ padding: "4px 6px", textAlign: "center" }}>
-            <p
-              style={textStyle(ctx.m, {
-                margin: "0",
-                fontSize: "11px",
-                lineHeight: "16px",
-                fontWeight: 900,
-                letterSpacing: "0.8px",
-                textTransform: "uppercase",
-              })}
+    <table
+      role="presentation"
+      width="100%"
+      cellPadding={0}
+      cellSpacing={0}
+      border={0}
+      style={{
+        borderCollapse: "separate",
+        margin: "6px 0 24px",
+        backgroundColor: METRIC_BG,
+        border: `1px solid ${METRIC_BORDER}`,
+        borderRadius: "10px",
+      }}
+    >
+      <tbody>
+        <tr>
+          {items.map((it, i) => (
+            <td
+              key={i}
+              width={width}
+              valign="top"
+              align="center"
+              style={{
+                padding: "16px 8px 14px",
+                textAlign: "center",
+                borderLeft: i === 0 ? "none" : `1px solid ${METRIC_BORDER}`,
+              }}
             >
-              {it.label}
-            </p>
-            {anySublabel ? (
-              <p style={textStyle(ctx.m, { margin: "0", fontSize: "10px", lineHeight: "14px", color: MUTED })}>
-                {it.sublabel || "\u00a0"}
+              <p
+                style={textStyle(ctx.m, {
+                  margin: "0",
+                  fontSize: "24px",
+                  lineHeight: "30px",
+                  fontWeight: 700,
+                  letterSpacing: "-0.3px",
+                  fontVariantNumeric: "tabular-nums",
+                  color: ctx.m.branding.primaryColor,
+                })}
+              >
+                {it.value}
               </p>
-            ) : null}
-            <p
-              style={textStyle(ctx.m, {
-                margin: "6px 0 0",
-                fontSize: "20px",
-                lineHeight: "26px",
-                fontWeight: 700,
-                color: ctx.m.branding.primaryColor,
-              })}
-            >
-              {it.value}
-            </p>
-          </td>
-        ))}
-      </tr>
-    </Table>
+              <p
+                style={textStyle(ctx.m, {
+                  margin: "6px 0 0",
+                  fontSize: "13px",
+                  lineHeight: "18px",
+                  fontWeight: 600,
+                })}
+              >
+                {it.label}
+              </p>
+              {anySublabel ? (
+                <p style={textStyle(ctx.m, { margin: "1px 0 0", fontSize: "11px", lineHeight: "15px", color: MUTED })}>
+                  {it.sublabel || "\u00a0"}
+                </p>
+              ) : null}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
   );
 }
 

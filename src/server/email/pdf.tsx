@@ -193,14 +193,35 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
     case "metrics": {
       const anySublabel = node.attrs.items.some((m) => m.sublabel);
       return (
-        <View style={{ flexDirection: "row", marginTop: 4, marginBottom: 14 }} wrap={false}>
+        <View
+          style={{
+            flexDirection: "row",
+            marginTop: 4,
+            marginBottom: 16,
+            backgroundColor: "#f6f8f7",
+            borderWidth: 0.75,
+            borderColor: "#e3e8e6",
+            borderRadius: 6,
+          }}
+          wrap={false}
+        >
           {node.attrs.items.map((m, i) => (
-            <View key={i} style={{ flex: 1, alignItems: "center", paddingHorizontal: 4 }}>
-              <Text style={{ fontSize: 8, fontFamily: ctx.f.black, letterSpacing: 0.6, color: ctx.text, textAlign: "center" }}>
-                {m.label.toUpperCase()}
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                paddingHorizontal: 4,
+                paddingVertical: 10,
+                borderLeftWidth: i === 0 ? 0 : 0.75,
+                borderLeftColor: "#e3e8e6",
+              }}
+            >
+              <Text style={{ fontSize: 17, fontFamily: ctx.f.bold, color: ctx.color }}>{m.value}</Text>
+              <Text style={{ fontSize: 8.5, fontFamily: ctx.f.bold, color: ctx.text, marginTop: 3, textAlign: "center" }}>
+                {m.label}
               </Text>
-              {anySublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center" }}>{m.sublabel || " "}</Text> : null}
-              <Text style={{ fontSize: 15, fontFamily: ctx.f.bold, color: ctx.color, marginTop: 4 }}>{m.value}</Text>
+              {anySublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center", marginTop: 1 }}>{m.sublabel || " "}</Text> : null}
             </View>
           ))}
         </View>
