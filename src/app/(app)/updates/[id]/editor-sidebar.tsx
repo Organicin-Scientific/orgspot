@@ -253,7 +253,7 @@ function Revisions({
                 </div>
               </div>
               {editable && (
-                <Button variant="ghost" size="xs" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setRestoring(r)}>
+                <Button variant="ghost" size="xs" className="pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setRestoring(r)}>
                   <RotateCcw /> Restore
                 </Button>
               )}

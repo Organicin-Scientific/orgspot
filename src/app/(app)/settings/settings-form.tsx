@@ -263,7 +263,7 @@ export function SettingsForm({
             </CardContent>
           </Card>
 
-          <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur">
+          <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 chrome border-t px-6 py-3">
             {dirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
             <Button type="submit" disabled={saving || !dirty}>
               {saving && <Loader2 className="animate-spin" />}

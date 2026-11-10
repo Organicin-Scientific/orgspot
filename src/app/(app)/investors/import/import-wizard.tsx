@@ -611,7 +611,7 @@ function Stat({ testId, label, value, muted }: { testId: string; label: string; 
   return (
     <div className="rounded-xl border p-4" data-testid={testId}>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 text-2xl font-semibold tabular-nums", muted && value > 0 && "text-muted-foreground")}>{formatNumber(value)}</div>
+      <div className={cn("mt-1 text-2xl font-semibold tabular-nums tracking-tight", muted && value > 0 && "text-muted-foreground")}>{formatNumber(value)}</div>
     </div>
   );
 }

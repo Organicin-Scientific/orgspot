@@ -149,6 +149,7 @@
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Staggered entrance for dashboard panels. Set --i on each panel (0, 1, 2…). */
@@ -166,12 +167,12 @@
 /* Bars grow from their start edge on first paint. */
 .dash-bar {
   transform-origin: left center;
-  animation: dash-bar 520ms var(--ease-out) both;
+  animation: dash-bar 360ms var(--ease-out) both;
   animation-delay: calc(120ms + var(--i, 0) * 60ms);
 }
 .dash-bar-v {
   transform-origin: center bottom;
-  animation: dash-bar-v 480ms var(--ease-out) both;
+  animation: dash-bar-v 340ms var(--ease-out) both;
   animation-delay: calc(120ms + var(--i, 0) * 40ms);
 }
 @keyframes dash-bar {
@@ -380,5 +381,60 @@
     animation: none;
     color: var(--muted-foreground);
     background: none;
+  }
+}
+
+/*
+ * Floating chrome (sticky headers, action bars). Content scrolls underneath a translucent
+ * layer instead of an opaque strip. Falls back to solid for reduced transparency and
+ * increased contrast.
+ */
+.chrome {
+  background-color: color-mix(in oklch, var(--background) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .chrome {
+    background-color: var(--background);
+    backdrop-filter: none;
+  }
+}
+
+/* Reduced motion: sheets and dialogs cross-fade in place instead of sliding or zooming. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="sheet-content"],
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"] {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+  }
+}
+
+/* Content revealed in place (expanded detail rows). Entry only; removal is instant. */
+.reveal {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* Status text that swaps in place (save indicator). Opacity only, no movement. */
+.reveal-fade {
+  transition: opacity 150ms ease;
+  @starting-style {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    @starting-style {
+      transform: none;
+    }
   }
 }
