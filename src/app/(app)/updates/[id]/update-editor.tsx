@@ -239,7 +239,7 @@ export function UpdateEditor({
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="z-30 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-2.5 backdrop-blur md:sticky md:top-0">
+      <header className="z-30 flex flex-wrap items-center gap-2 chrome border-b px-4 py-2.5 md:sticky md:top-0">
         <Button asChild variant="ghost" size="icon-sm" aria-label="Back to updates">
           <Link href="/updates" onClick={() => void flush()}>
             <ChevronLeft />

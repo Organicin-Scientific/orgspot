@@ -383,3 +383,33 @@
     background: none;
   }
 }
+
+/*
+ * Floating chrome (sticky headers, action bars). Content scrolls underneath a translucent
+ * layer instead of an opaque strip. Falls back to solid for reduced transparency and
+ * increased contrast.
+ */
+.chrome {
+  background-color: color-mix(in oklch, var(--background) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .chrome {
+    background-color: var(--background);
+    backdrop-filter: none;
+  }
+}
+
+/* Reduced motion: sheets and dialogs cross-fade in place instead of sliding or zooming. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="sheet-content"],
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"] {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+  }
+}

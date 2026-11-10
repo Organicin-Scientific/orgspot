@@ -63,7 +63,7 @@ export function AppShell({ email, liveSending, environment, children }: ShellPro
         </SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 chrome border-b px-4 md:hidden">
           <Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="Open navigation">
             <Menu />
           </Button>

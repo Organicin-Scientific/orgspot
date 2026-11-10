@@ -319,7 +319,7 @@ function Review({
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-baseline justify-between">
               <span>Will receive this update</span>
-              <span className="text-2xl font-semibold tabular-nums">{formatNumber(c.stats.eligible)}</span>
+              <span className="text-2xl font-semibold tabular-nums tracking-tight">{formatNumber(c.stats.eligible)}</span>
             </div>
             {c.stats.excluded > 0 && (
               <div className="space-y-1 rounded-md bg-muted/50 p-3">
