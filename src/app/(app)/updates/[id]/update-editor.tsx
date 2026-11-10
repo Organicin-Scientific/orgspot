@@ -404,7 +404,9 @@ function SaveIndicator({ state, savedAt, editable }: { state: SaveState; savedAt
       className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex"
       aria-live="polite"
     >
-      {content}
+      <span key={state} className="reveal-fade inline-flex items-center gap-1">
+        {content}
+      </span>
     </span>
   );
 }

@@ -413,3 +413,28 @@
     --tw-exit-scale: 1;
   }
 }
+
+/* Content revealed in place (expanded detail rows). Entry only; removal is instant. */
+.reveal {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* Status text that swaps in place (save indicator). Opacity only, no movement. */
+.reveal-fade {
+  transition: opacity 150ms ease;
+  @starting-style {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    @starting-style {
+      transform: none;
+    }
+  }
+}

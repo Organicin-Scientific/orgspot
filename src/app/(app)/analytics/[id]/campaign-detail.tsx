@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileDown, FlaskConical, Loader2, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, FileDown, FlaskConical, Loader2, Mail } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -285,7 +286,9 @@ function Recipients({ campaignId, refreshKey }: { campaignId: string; refreshKey
                 const open = expanded === rc.id;
                 const rows = [
                   <TableRow key={rc.id} className="cursor-pointer" onClick={() => setExpanded(open ? null : rc.id)} aria-expanded={open}>
-                    <TableCell>{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</TableCell>
+                    <TableCell>
+                      <ChevronRight className={cn("size-4 transition-transform duration-150 ease-(--ease-out)", open && "rotate-90")} />
+                    </TableCell>
                     <TableCell>
                       <div className="max-w-60 truncate font-medium">{fullName(rc) || rc.email}</div>
                       <div className="max-w-60 truncate text-xs text-muted-foreground">{rc.email}</div>
@@ -303,7 +306,7 @@ function Recipients({ campaignId, refreshKey }: { campaignId: string; refreshKey
                   rows.push(
                     <TableRow key={`${rc.id}-events`} className="hover:bg-transparent">
                       <TableCell />
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={4} className="reveal">
                         <Timeline campaignId={campaignId} recipient={rc} />
                       </TableCell>
                     </TableRow>,
