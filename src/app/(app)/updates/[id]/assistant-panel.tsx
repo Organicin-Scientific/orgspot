@@ -57,6 +57,9 @@ export function AssistantPanel({
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
+  // Only replies that arrive while the panel is open animate in; saved history and the
+  // author's own message (sent with Enter) appear instantly.
+  const [liveReplies, setLiveReplies] = useState<Set<string>>(() => new Set());
   const fileInput = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -115,6 +118,7 @@ export function AssistantPanel({
       if (attached) form.set("file", attached);
       const res = await api<TurnResponse>(`/api/updates/${updateId}/assistant`, { form });
       if (res.content) await onApply(res.content);
+      setLiveReplies((ids) => new Set([...ids, ...res.messages.filter((m) => m.role === "assistant").map((m) => m.id)]));
       setMessages((m) => [...(m ?? []), ...res.messages]);
     } catch (err) {
       // Give the author their message back so nothing they typed is lost.
@@ -171,11 +175,11 @@ export function AssistantPanel({
         ) : (
           <ol className="space-y-5 pt-1">
             {messages.map((m) => (
-              <MessageItem key={m.id} message={m} />
+              <MessageItem key={m.id} message={m} animate={liveReplies.has(m.id)} />
             ))}
             {pending && (
               <>
-                <MessageItem message={{ role: "user", text: pending.text, fileName: pending.fileName, changeSummary: null }} />
+                <MessageItem message={{ role: "user", text: pending.text, fileName: pending.fileName, changeSummary: null }} animate={false} />
                 <li className={`flex items-center gap-2 text-sm text-muted-foreground ${ENTER}`}>
                   <span className="flex size-6 items-center justify-center rounded-full bg-brand/10 text-brand">
                     <Sparkles className="size-3.5" />
@@ -195,7 +199,7 @@ export function AssistantPanel({
               The assistant needs Vertex AI enabled for this project. See docs/ai-drafting.md.
             </p>
           )}
-          <div className="rounded-xl border bg-background shadow-xs transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+          <div className="rounded-xl border bg-background shadow-xs transition-[border-color,box-shadow] duration-150 ease focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
             {file && (
               <div className={`flex items-center gap-2 border-b px-3 py-2 text-xs ${ENTER}`}>
                 <FileText className="size-3.5 shrink-0 text-muted-foreground" />
@@ -266,7 +270,7 @@ export function AssistantPanel({
             {messages && messages.length > 0 && (
               <button
                 type="button"
-                className="inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
+                className={`inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:text-foreground ${PRESS}`}
                 onClick={() => setClearOpen(true)}
                 disabled={busy}
               >
@@ -342,10 +346,16 @@ function EmptyState({
   );
 }
 
-function MessageItem({ message }: { message: Pick<AssistantMessage, "role" | "text" | "fileName" | "changeSummary"> }) {
+function MessageItem({
+  message,
+  animate,
+}: {
+  message: Pick<AssistantMessage, "role" | "text" | "fileName" | "changeSummary">;
+  animate: boolean;
+}) {
   if (message.role === "user") {
     return (
-      <li className={`flex flex-col items-end gap-1 ${ENTER}`}>
+      <li className="flex flex-col items-end gap-1">
         {message.fileName && (
           <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs">
             <FileText className="size-3 shrink-0 text-muted-foreground" />
@@ -361,7 +371,7 @@ function MessageItem({ message }: { message: Pick<AssistantMessage, "role" | "te
     );
   }
   return (
-    <li className={`flex gap-2 ${ENTER}`}>
+    <li className={`flex gap-2 ${animate ? ENTER : ""}`}>
       <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
         <Sparkles className="size-3.5" />
       </span>
