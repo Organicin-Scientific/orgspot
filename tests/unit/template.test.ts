@@ -47,6 +47,17 @@ describe("template prompts", () => {
     expect(countPromptMarkers(`${PROMPT_OPEN}a] ${PROMPT_OPEN}b]`)).toBe(2);
   });
 
+  it("carries the three standing metrics with their measurement basis", () => {
+    const metrics = starterDocument().content.find((b) => b.type === "metrics") as
+      | { attrs: { items: { label: string; sublabel: string }[] } }
+      | undefined;
+    expect(metrics?.attrs.items.map((i) => [i.label, i.sublabel])).toEqual([
+      ["Revenue YTD", "cash received since Jan 1"],
+      ["Receivables", "invoiced, not yet paid"],
+      ["Pipeline", "proposed, not yet signed"],
+    ]);
+  });
+
   it("opens with the current company description and the 2026 section order", () => {
     const doc = starterDocument();
     const text = JSON.stringify(doc);

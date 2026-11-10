@@ -26,7 +26,7 @@ const doc: DocNode = {
     { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Commercial" }] },
     {
       type: "metrics",
-      attrs: { items: [{ label: "Contracts signed", sublabel: "", value: "$239K+" }, { label: "Pipeline", sublabel: "next two quarters", value: "$800K+" }] },
+      attrs: { items: [{ label: "Receivables", sublabel: "invoiced, not yet paid", value: "$239K+" }, { label: "Pipeline", sublabel: "proposed, not yet signed", value: "$800K+" }] },
     },
     {
       type: "bulletList",
@@ -72,7 +72,10 @@ describe("brand defaults", () => {
     expect(html).not.toContain("<ul");
     expect(html.toLowerCase()).not.toContain("#f2b772");
     expect(html).toContain("family=Nunito+Sans");
-    expect(html).toContain("text-transform:uppercase");
+    // Metrics strip: value first in tabular figures, on the tinted panel shared with the editor.
+    expect(html).toContain("font-variant-numeric:tabular-nums");
+    expect(html.toLowerCase()).toContain("#f6f8f7");
+    expect(html.indexOf("$239K+")).toBeLessThan(html.indexOf("Receivables"));
     if (process.env.BRAND_HTML_OUT) (await import("node:fs")).writeFileSync(process.env.BRAND_HTML_OUT, html);
   });
 });

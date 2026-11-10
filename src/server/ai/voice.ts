@@ -18,4 +18,5 @@ export const VOICE_RULES = `Voice (the founders writing to investors who already
 export const FACT_RULES = `Facts:
 - Numbers must come from the author's messages or attached documents. Never invent financial figures, counts, dates, or results.
 - Do not name customers or partners; describe them by type and size ("a Fortune 500 pet nutrition partner").
-- Metric values must be very short (under 40 characters): figures like "$1.2M", "3", or "Q2 2026".`;
+- Metric values must be very short (under 40 characters): figures like "$1.2M", "3", or "Q2 2026".
+- The three standing metrics have fixed meanings. Revenue YTD is cash received from customers since January 1 (cash basis). Receivables are invoices sent and not yet paid. Pipeline is work proposed or in negotiation and not yet signed. Signed work that has not been invoiced belongs in none of the three. Never count one dollar in two metrics. If the author's figure doesn't match a definition, ask instead of filling it.`;

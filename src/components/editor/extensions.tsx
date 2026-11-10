@@ -41,12 +41,15 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
     >
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((it, i) => (
-          <div key={i} className="rounded-md border border-[#e3e8e6] bg-[#f6f8f7] px-3 py-4 text-center">
+          <div
+            key={i}
+            className="rounded-[10px] border border-[#e3e8e6] bg-[#f6f8f7] px-3 pt-4 pb-3.5 text-center transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-[var(--doc-brand)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--doc-brand)_14%,transparent)]"
+          >
             <MetricInput
               value={it.value}
               placeholder="Value"
               disabled={!editable}
-              className="text-[26px] font-bold leading-tight text-[var(--doc-brand)]"
+              className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]"
               maxLength={40}
               onChange={(v) => set(i, { value: v })}
               ariaLabel={`Metric ${i + 1} value`}
@@ -55,7 +58,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
               value={it.label}
               placeholder="Label"
               disabled={!editable}
-              className="mt-1 text-[13px] font-semibold"
+              className="mt-1.5 text-[13px] font-semibold"
               maxLength={80}
               onChange={(v) => set(i, { label: v })}
               ariaLabel={`Metric ${i + 1} label`}
@@ -64,7 +67,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
               value={it.sublabel}
               placeholder="Detail (optional)"
               disabled={!editable}
-              className="text-[12px] text-[#666]"
+              className="mt-px text-[12px] text-[#6b7280]"
               maxLength={120}
               onChange={(v) => set(i, { sublabel: v })}
               ariaLabel={`Metric ${i + 1} detail`}
@@ -76,7 +79,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
         <div className="mt-1.5 flex justify-end gap-1 font-sans text-xs text-[#666]">
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-[#eef1f0] disabled:opacity-40"
+            className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0] disabled:pointer-events-none disabled:opacity-40"
             disabled={items.length <= 1}
             onClick={() => updateAttributes({ items: items.slice(0, -1) })}
           >
@@ -84,7 +87,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-[#eef1f0] disabled:opacity-40"
+            className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0] disabled:pointer-events-none disabled:opacity-40"
             disabled={items.length >= 4}
             onClick={() => updateAttributes({ items: [...items, { label: "", sublabel: "", value: "" }] })}
           >

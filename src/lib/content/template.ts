@@ -56,9 +56,9 @@ export function starterDocument(): DocNode {
         type: "metrics",
         attrs: {
           items: [
-            { label: "Revenue this quarter", sublabel: "", value: `${PROMPT_OPEN}revenue this quarter]` },
-            { label: "Contracts signed", sublabel: "", value: `${PROMPT_OPEN}contracts signed count]` },
-            { label: "Pipeline", sublabel: "next two quarters", value: `${PROMPT_OPEN}pipeline next 2 quarters]` },
+            { label: "Revenue YTD", sublabel: "cash received since Jan 1", value: `${PROMPT_OPEN}cash received YTD]` },
+            { label: "Receivables", sublabel: "invoiced, not yet paid", value: `${PROMPT_OPEN}open invoices]` },
+            { label: "Pipeline", sublabel: "proposed, not yet signed", value: `${PROMPT_OPEN}open proposals]` },
           ],
         },
       },
