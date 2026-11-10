@@ -28,7 +28,7 @@ import type { Campaign, ExcludedRecipient, InvestorGroup, PdfDelivery } from "@/
 import { cn } from "@/lib/utils";
 
 interface Props {
-  update: { id: string; title: string; subject: string; pdfDelivery: PdfDelivery; attachmentCount: number };
+  update: { id: string; title: string; subject: string; pdfDelivery: PdfDelivery };
   groups: InvestorGroup[];
   activeCount: number;
   readiness: { ready: boolean; problems: string[] };
@@ -175,7 +175,6 @@ export function SendFlow({ update, groups, activeCount, readiness, liveSending, 
         ) : (
           <Review
             campaignId={campaignId}
-            update={update}
             onDiscard={() => setCampaignId(null)}
             onApproved={(id) => router.push(`/analytics/${id}`)}
           />
@@ -187,12 +186,10 @@ export function SendFlow({ update, groups, activeCount, readiness, liveSending, 
 
 function Review({
   campaignId,
-  update,
   onDiscard,
   onApproved,
 }: {
   campaignId: string;
-  update: Props["update"];
   onDiscard: () => void;
   onApproved: (id: string) => void;
 }) {
@@ -310,7 +307,6 @@ function Review({
                   </a>
                 )}
               </Item>
-              {update.attachmentCount > 0 && <Item label="Files">{update.attachmentCount} additional file(s) as download links</Item>}
               <Item label="Audience">{c.audience.allActive ? "All active investors" : c.audience.groupNames.join(", ")}</Item>
             </dl>
           </CardContent>

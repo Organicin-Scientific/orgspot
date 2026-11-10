@@ -19,7 +19,7 @@ export const RATE_LIMITS = {
   testSend: { limit: 10, windowSeconds: 600 },
   campaign: { limit: 20, windowSeconds: 600 },
   export: { limit: 10, windowSeconds: 600 },
-  aiDraft: { limit: 15, windowSeconds: 600 },
+  aiDraft: { limit: 30, windowSeconds: 600 },
   publicLink: { limit: 30, windowSeconds: 60 },
 } satisfies Record<string, RateLimitRule>;
 

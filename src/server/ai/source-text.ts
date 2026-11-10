@@ -3,6 +3,8 @@ import mammoth from "mammoth";
 import { badRequest } from "../http/errors";
 
 const MAX_EXTRACTED_CHARS = 400_000;
+/** Vercel functions accept request bodies up to 4.5 MB, including the editor content. */
+export const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -17,13 +19,13 @@ export async function sourceFromUpload(file: File): Promise<SourceAttachment | n
 
   if (mime === "application/pdf" || lower.endsWith(".pdf")) {
     const buf = Buffer.from(await file.arrayBuffer());
-    if (buf.length > 12 * 1024 * 1024) throw badRequest("PDFs must be 12 MB or smaller.");
+    if (buf.length > MAX_SOURCE_BYTES) throw badRequest("Documents must be 4 MB or smaller.");
     return { kind: "pdf", mimeType: "application/pdf", base64: buf.toString("base64"), filename: name };
   }
 
   if (mime === DOCX_MIME || lower.endsWith(".docx")) {
     const buf = Buffer.from(await file.arrayBuffer());
-    if (buf.length > 8 * 1024 * 1024) throw badRequest("Word documents must be 8 MB or smaller.");
+    if (buf.length > MAX_SOURCE_BYTES) throw badRequest("Documents must be 4 MB or smaller.");
     const result = await mammoth.extractRawText({ buffer: buf });
     const text = truncateSource(result.value);
     if (!text.trim()) throw badRequest("Could not extract text from that Word document.");
@@ -40,7 +42,7 @@ export async function sourceFromUpload(file: File): Promise<SourceAttachment | n
     return { kind: "text", text, filename: name };
   }
 
-  throw badRequest("Upload a PDF, Word (.docx), or plain-text file, or use notes only.");
+  throw badRequest("Attach a PDF, Word (.docx) or text file.");
 }
 
 export function truncateSource(text: string): string {

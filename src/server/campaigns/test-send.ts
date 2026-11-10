@@ -11,7 +11,7 @@ import { PLACEHOLDERS, pdfFilename, personalize, renderUpdateEmail, testPersonal
 import { env } from "../env";
 import { db } from "../firebase-admin";
 import { notFound, precondition } from "../http/errors";
-import { getAssets, publishAssets } from "../storage";
+import { publishAssets, type StoredAsset } from "../storage";
 import { senderDomainCheck } from "./prepare";
 
 export interface TestSendResult {
@@ -31,7 +31,8 @@ export async function sendTestEmail(updateId: string, recipients: string[], acto
   const domainProblem = await senderDomainCheck(settings.sender.fromEmail);
   if (domainProblem) throw precondition(domainProblem);
 
-  const attachments = (await getAssets(update.attachmentIds)).filter((a) => a.kind === "attachment");
+  // Updates no longer carry extra files; the PDF copy is the only attachment.
+  const attachments: StoredAsset[] = [];
   const rendered = await renderUpdateEmail({
     title: update.title,
     subject: update.subject,

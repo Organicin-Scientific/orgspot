@@ -23,7 +23,7 @@ export default async function SendPage({ params }: { params: Promise<{ id: strin
   const readiness = await fullSendReadiness(settings);
   return (
     <SendFlow
-      update={{ id: update.id, title: update.title, subject: update.subject, pdfDelivery: update.pdfDelivery, attachmentCount: update.attachmentIds.length }}
+      update={{ id: update.id, title: update.title, subject: update.subject, pdfDelivery: update.pdfDelivery }}
       groups={groups}
       activeCount={activeCount}
       readiness={readiness}

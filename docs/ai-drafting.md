@@ -1,6 +1,8 @@
-# AI template drafting (Vertex Gemini)
+# Drafting assistant (Vertex Gemini)
 
-Admins can fill `[Write: …]` placeholders from quarter notes or documents while keeping the standard investor-update template. Calls run **server-side only** through **Vertex AI** in the same GCP project as Firebase (`FIREBASE_PROJECT_ID`).
+The **Assistant** tab in the update editor's right sidebar is a chat with Gemini. Admins paste notes, attach a PDF, Word or text document (4 MB max), or ask for changes, and Gemini writes into the update inside the standard template: it fills `[Write: …]` placeholders and can replace, insert or delete top-level blocks. The house voice rules live in `src/server/ai/voice.ts`.
+
+Edits go straight into the document. The editor is read-only while a turn runs, and a manual revision is saved before and after each change, so History can restore the earlier version. The conversation is saved per update. Calls run **server-side only** through **Vertex AI** in the same GCP project as Firebase (`FIREBASE_PROJECT_ID`).
 
 ## Vercel (orgspot)
 
@@ -45,10 +47,10 @@ In [Google Cloud Console](https://console.cloud.google.com/):
 
 ## Verify
 
-1. Open an editable update on production → **Draft with AI** should be available (not disabled).
-2. Paste short quarter notes → **Generate draft** → **Apply to editor**.
+1. Open an editable update on production → the **Assistant** tab should accept messages.
+2. Paste short quarter notes or attach a document and send. The document updates and the reply says what changed.
 3. If it fails with permission errors, confirm IAM and that the model id `gemini-3.8-flash` is available in `us-central1`.
 
 ## Data handling
 
-Notes and uploaded files are sent to **Vertex Gemini** in your GCP project. They are not written to the audit log in full (only counts are audited).
+Messages and attached documents are sent to **Vertex Gemini** in your GCP project. Message text is stored in `updates/{id}/assistantMessages`; attached files are read once and not stored (only the file name is kept). The audit log records each turn without its content.

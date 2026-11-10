@@ -5,7 +5,6 @@ import { GMAIL_CLIP_BYTES, personalize, renderUpdateEmail, testPersonalization }
 import { badRequest, notFound } from "@/server/http/errors";
 import { ok, readJson, withAdmin } from "@/server/http/handler";
 import { previewInput } from "@/server/http/schemas";
-import { getAssets } from "@/server/storage";
 
 /** Render the exact production email for the editor's current (possibly unsaved) content. */
 export const POST = withAdmin<{ id: string }>(async ({ req, params }) => {
@@ -15,15 +14,14 @@ export const POST = withAdmin<{ id: string }>(async ({ req, params }) => {
   const parsed = parseDoc(input.content);
   if (!parsed.ok) throw badRequest(parsed.error);
   const settings = await getSettings();
-  const attachments = (await getAssets(input.attachmentIds)).filter((a) => a.kind === "attachment");
-  const rendered = await renderUpdateEmail({
+    const rendered = await renderUpdateEmail({
     title: input.title,
     subject: input.subject,
     previewText: input.previewText,
     content: parsed.doc,
     bannerAssetId: input.bannerAssetId,
     pdfDelivery: input.pdfDelivery,
-    attachments,
+    attachments: [],
     settings,
     mode: "preview",
   });

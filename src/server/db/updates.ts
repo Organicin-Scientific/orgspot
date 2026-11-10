@@ -242,6 +242,7 @@ export async function deleteUpdate(id: string): Promise<void> {
     tx.delete(ref);
   });
   await db().recursiveDelete(ref.collection("revisions"));
+  await db().recursiveDelete(ref.collection("assistantMessages"));
 }
 
 function toRevision(snap: DocumentSnapshot, updateId: string): UpdateRevision {

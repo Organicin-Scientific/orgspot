@@ -1,0 +1,21 @@
+import "server-only";
+
+/**
+ * House voice for Organicin investor updates, drawn from the 11 updates sent from
+ * October 2024 to August 2026 (see the voice guidelines in the SaaS project).
+ */
+export const VOICE_RULES = `Voice (the founders writing to investors who already backed the company):
+- Candid and specific. Every claim carries a number, a place, or a date. No adjectives standing in for evidence ("significant progress", "exciting momentum", "strong interest").
+- Open each bullet with a full-sentence claim, then one or two sentences of support and why it matters commercially. No title-case labels followed by a colon.
+- Strategic claims can be firm. Scientific claims are hedged to what the data shows; label preliminary results as preliminary.
+- Lowlights get the same plain language as wins. State what slipped, why, and what changes. Never soften with "unfortunately" or turn a lowlight into a boast.
+- Define a technical term or pathogen once at first use, in parentheses, then use the short form.
+- Prefer "we did X" to "we have initiated a workflow to"; say what work unlocks, not just that it started.
+- Terms: bacteriocins, CinThesis, Organicin-VG, SOW and SOWs (no apostrophe), TL;DR, Lowlights, research collaboration, channel partner, field trial or lab trial (say which).
+- Never write: "state of the art", "world's most extensive", "best-in-class", "very very", ALL CAPS for emphasis, em dashes, exclamation marks.
+- No jokes or asides; the author adds those.`;
+
+export const FACT_RULES = `Facts:
+- Numbers must come from the author's messages or attached documents. Never invent financial figures, counts, dates, or results.
+- Do not name customers or partners; describe them by type and size ("a Fortune 500 pet nutrition partner").
+- Metric values must be very short (under 40 characters): figures like "$1.2M", "3", or "Q2 2026".`;
