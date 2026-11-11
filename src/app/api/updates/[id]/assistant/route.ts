@@ -24,7 +24,7 @@ export const GET = withAdmin<P>(async ({ params }) => {
 
 /**
  * One chat turn. Form fields: `message` (text), `content` (the editor's current document as
- * JSON) and an optional `file` (PDF, Word or text).
+ * JSON) and an optional `file` (PDF, Word, Markdown or text).
  *
  * Input errors return JSON as usual. Once the input is valid the response is a stream of
  * newline-delimited events: `step` labels as the turn progresses, then one `done` carrying the

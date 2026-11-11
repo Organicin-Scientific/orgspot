@@ -35,14 +35,15 @@ export async function sourceFromUpload(file: File): Promise<SourceAttachment | n
   if (
     mime.startsWith("text/") ||
     lower.endsWith(".txt") ||
-    lower.endsWith(".md")
+    lower.endsWith(".md") ||
+    lower.endsWith(".markdown")
   ) {
     const text = truncateSource(await file.text());
     if (!text.trim()) throw badRequest("That text file is empty.");
     return { kind: "text", text, filename: name };
   }
 
-  throw badRequest("Attach a PDF, Word (.docx) or text file.");
+  throw badRequest("Attach a PDF, Word (.docx), Markdown (.md) or text file.");
 }
 
 export function truncateSource(text: string): string {

@@ -21,7 +21,8 @@ type TurnResponse = {
 
 type Pending = { text: string; fileName: string | null; startedAt: number };
 
-const ACCEPT = ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown";
+const ACCEPT =
+  ".pdf,.docx,.txt,.md,.markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/x-markdown";
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 const SUGGESTIONS = [
@@ -254,8 +255,8 @@ export function AssistantPanel({
                 variant="ghost"
                 size="icon-sm"
                 className={PRESS}
-                aria-label="Attach a PDF, Word or text document"
-                title="Attach a PDF, Word or text document (4 MB max)"
+                aria-label="Attach a PDF, Word, Markdown or text document"
+                title="Attach a PDF, Word, Markdown or text document (4 MB max)"
                 disabled={!enabled || busy}
                 onClick={() => fileInput.current?.click()}
               >
@@ -334,7 +335,7 @@ function EmptyState({
               className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-muted/60 ${PRESS}`}
             >
               <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
-              Draft from a PDF or Word document
+              Draft from a PDF, Word or Markdown document
             </button>
           </li>
           {SUGGESTIONS.map((s) => (
