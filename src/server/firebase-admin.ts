@@ -5,21 +5,21 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { env } from "./env";
 
-let app: App | null = null;
-
-// firebase-admin is shared process-wide, but this module can be evaluated more than once
-// (separate route bundles, dev reloads). Firestore settings may only be applied once.
-const shared = globalThis as typeof globalThis & { __adminFirestore?: Firestore };
+// This module can be evaluated more than once per process (separate route bundles, dev
+// reloads), each with its own copy of firebase-admin. Keeping the app and Firestore on
+// globalThis means one set of credentials, one access token and one gRPC channel per
+// warm instance instead of one per bundle. Firestore settings may only be applied once.
+const shared = globalThis as typeof globalThis & { __adminApp?: App; __adminFirestore?: Firestore };
 
 function adminApp(): App {
-  if (app) return app;
+  if (shared.__adminApp) return shared.__adminApp;
   if (getApps().length) {
-    app = getApp();
-    return app;
+    shared.__adminApp = getApp();
+    return shared.__adminApp;
   }
   const e = env();
   const hasServiceAccount = Boolean(e.FIREBASE_CLIENT_EMAIL && e.FIREBASE_PRIVATE_KEY);
-  app = initializeApp({
+  const app = initializeApp({
     projectId: e.FIREBASE_PROJECT_ID,
     storageBucket: e.FIREBASE_STORAGE_BUCKET,
     ...(hasServiceAccount
@@ -33,6 +33,7 @@ function adminApp(): App {
         }
       : {}),
   });
+  shared.__adminApp = app;
   return app;
 }
 
