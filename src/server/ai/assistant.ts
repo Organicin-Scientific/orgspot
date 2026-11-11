@@ -15,7 +15,7 @@ import {
   docOutline,
   type AssistantEdit,
 } from "@/lib/content/assistant-edits";
-import { listTemplatePrompts } from "@/lib/content/prompt-fills";
+import { applyPromptFills, listTemplatePrompts, type ListedPrompt } from "@/lib/content/prompt-fills";
 import { parseDoc, type DocNode } from "@/lib/content/schema";
 import type { AssistantMessage } from "@/lib/types";
 import { env } from "../env";
@@ -30,13 +30,21 @@ const SYSTEM_PROMPT = `You are the drafting assistant inside Organicin Scientifi
 Each author message comes with the update as it stands: a numbered outline of its top-level blocks, and the list of unfilled "[Write: …]" template prompts with their ids.
 
 How you change the update:
-- Use "fills" to answer template prompts by id. Follow each prompt's instruction. When a prompt fits the material, fill it rather than adding new blocks.
+- Use "fills" to answer template prompts by id. Follow each prompt's instruction.
+- Use "removals" for the ids of prompts the material doesn't support. That includes optional prompts, spare bullets and metric cards with no matching figure. A removed prompt takes its empty bullet or label with it. Leave a prompt in place only when the author has to supply something you can't, and name it in the reply.
 - Use "edits" for anything else. "replace" rewrites the block at an outline index. "insert_after" adds a new block after an index (-1 puts it at the top). "delete" removes a block. Indices always refer to the outline in the latest message, so several edits in one reply never shift each other.
+- Never write "[Write: …]" or any other placeholder yourself. Write finished text, or leave the thing out.
 - Keep the template's sections and order. Don't delete headings, the opening quote, the "What do we do?" line or the metrics unless the author asks.
-- For a replaced or inserted block give "type" plus "text" (paragraph, heading, pull_quote), "items" (bullet_list, numbered_list, metrics as "Label | value" or "Label | sublabel | value"), and "level" 2 or 3 for headings. Use **double asterisks** for bold. Keep bold labels the template uses, such as **TL;DR**.
+- The metrics strip holds the standing figures. Fill or remove its prompts, or replace its values, but never rename a card or add one.
+- For a replaced or inserted block give "type" plus "text" (paragraph, heading, pull_quote), "items" (bullet_list, numbered_list, metrics as "Label | value"), and "level" 2 or 3 for headings. Use **double asterisks** for bold. Keep bold labels the template uses, such as **TL;DR**.
 - To revise text that is already written, replace its block with the full new version.
-- Change the update only when the author asks for a change or gives material to draft from. For questions or conversation, answer in "reply" and return empty "fills" and "edits".
-- If the material doesn't support a prompt, leave it unfilled and say what's missing.
+- Change the update only when the author asks for a change or gives material to draft from. For questions or conversation, answer in "reply" and return empty "fills", "removals" and "edits".
+
+When the author gives you a document to draft from:
+- Put every material fact from it into the update: wins, setbacks, figures, dates, corrections and financial notes. Keep the author's numbers exactly as written.
+- When a section has more items than the template has prompts, replace that list with one that holds them all. When a fact fits no section, add it as a short paragraph where it reads best, such as a financial note after Lowlights.
+- Add nothing the document doesn't say.
+- List in "left_out" each fact from the document you didn't use, one short line each, with the reason. Return an empty list when everything went in.
 
 "reply" is shown in the chat beside the document: one to four short plain-text sentences, no markdown, no lists. Say what you changed and what is still missing or uncertain. Don't repeat the drafted text.
 
@@ -48,6 +56,8 @@ const RESPONSE_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
     reply: { type: SchemaType.STRING },
+    removals: { type: SchemaType.ARRAY, items: { type: SchemaType.INTEGER } },
+    left_out: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     fills: {
       type: SchemaType.ARRAY,
       items: {
@@ -72,11 +82,13 @@ const RESPONSE_SCHEMA = {
       },
     },
   },
-  required: ["reply", "fills", "edits"],
+  required: ["reply", "fills", "removals", "edits", "left_out"],
 };
 
 const responseShape = z.object({
   reply: z.string().max(4_000),
+  removals: z.array(z.number().int().min(0).max(500)).max(200).default([]),
+  left_out: z.array(z.string().max(500)).max(40).default([]),
   fills: z.array(z.object({ id: z.number().int().min(0).max(500), text: z.string().max(8_000) })).max(200),
   edits: z
     .array(
@@ -100,6 +112,7 @@ export interface AssistantTurnResult {
   reply: string;
   content: DocNode | null;
   filled: number;
+  removed: number;
   edited: number;
   remainingPrompts: number;
 }
@@ -122,15 +135,38 @@ function historyContents(history: AssistantMessage[]): Content[] {
   return out;
 }
 
-function summarize(filled: number, edited: number): string | null {
+function summarize(filled: number, removed: number, edited: number): string | null {
   const parts: string[] = [];
-  if (filled) parts.push(`Filled ${filled} prompt${filled === 1 ? "" : "s"}`);
-  if (edited) parts.push(`${parts.length ? "edited" : "Edited"} ${edited} block${edited === 1 ? "" : "s"}`);
+  const add = (n: number, verb: string, noun: string) => {
+    if (!n) return;
+    const word = parts.length ? verb.toLowerCase() : verb;
+    parts.push(`${word} ${n} ${noun}${n === 1 ? "" : "s"}`);
+  };
+  add(filled, "Filled", "prompt");
+  add(removed, "Removed", "unused prompt");
+  add(edited, "Edited", "block");
   return parts.length ? parts.join(", ") : null;
 }
 
-export function changeSummary(result: Pick<AssistantTurnResult, "filled" | "edited">): string | null {
-  return summarize(result.filled, result.edited);
+export function changeSummary(result: Pick<AssistantTurnResult, "filled" | "removed" | "edited">): string | null {
+  return summarize(result.filled, result.removed, result.edited);
+}
+
+/** Shorten a prompt instruction to a readable name for the chat, e.g. "cash received YTD". */
+function promptName(instruction: string): string {
+  const first = instruction.split(/[.:]/)[0]!.trim();
+  return first.length > 70 ? `${first.slice(0, 67).trimEnd()}…` : first;
+}
+
+/**
+ * The chat reply plus two lists the author shouldn't have to dig for: facts from the
+ * attachment that didn't go in, and prompts still waiting for them.
+ */
+function composeReply(reply: string, leftOut: string[], remaining: ListedPrompt[]): string {
+  const sections = [reply];
+  if (leftOut.length) sections.push(["Not used from the attachment:", ...leftOut.map((l) => `- ${l}`)].join("\n"));
+  if (remaining.length) sections.push(["Still to fill:", ...remaining.map((p) => `- ${promptName(p.instruction)}`)].join("\n"));
+  return sections.join("\n\n");
 }
 
 export async function runAssistantTurn(opts: {
@@ -229,29 +265,54 @@ export async function runAssistantTurn(opts: {
     const text = f.text.trim();
     if (knownIds.has(f.id) && text) fills.set(f.id, text);
   }
+  const removals = new Set(parsed.data.removals.filter((id) => knownIds.has(id) && !fills.has(id)));
+  // Drafting from a document finishes the template: an optional prompt the document didn't
+  // fill has nothing to say, so it goes rather than sitting in the update as "[Write: …]".
+  if (opts.source) {
+    for (const p of prompts) if (p.optional && !fills.has(p.id)) removals.add(p.id);
+  }
   const edits: AssistantEdit[] = parsed.data.edits;
+  const leftOut = parsed.data.left_out.map((l) => l.trim()).filter(Boolean);
 
   const reply = parsed.data.reply.trim() || "Done.";
-  if (fills.size === 0 && edits.length === 0) {
-    return { reply, content: null, filled: 0, edited: 0, remainingPrompts: prompts.length };
-  }
+  const unchanged = (): AssistantTurnResult => ({
+    // A question gets a plain answer; the to-do list is for turns that drafted.
+    reply: composeReply(reply, leftOut, opts.source ? prompts : []),
+    content: null,
+    filled: 0,
+    removed: 0,
+    edited: 0,
+    remainingPrompts: prompts.length,
+  });
+  if (fills.size === 0 && removals.size === 0 && edits.length === 0) return unchanged();
 
   step("Checking the changes fit the template");
-  const applied = applyAssistantChanges(opts.doc, fills, edits);
-  const validated = parseDoc(applied.doc);
+  const applied = applyAssistantChanges(opts.doc, fills, edits, removals);
+  let doc = applied.doc;
+  let removed = applied.removed;
+  // Edits can re-introduce an optional prompt only by keeping an old block; sweep once more.
+  if (opts.source) {
+    const stray = new Set(listTemplatePrompts(doc).filter((p) => p.optional).map((p) => p.id));
+    if (stray.size) {
+      const swept = applyPromptFills(doc, new Map(), stray);
+      doc = swept.doc;
+      removed += swept.removed;
+    }
+  }
+  const validated = parseDoc(doc);
   if (!validated.ok) {
     log.warn("assistant.invalid_doc", { error: validated.error });
     throw badRequest("Gemini's edit didn't fit the update's format. Try rephrasing the request.");
   }
-  if (applied.filled === 0 && applied.edited === 0) {
-    return { reply, content: null, filled: 0, edited: 0, remainingPrompts: prompts.length };
-  }
+  if (applied.filled === 0 && removed === 0 && applied.edited === 0) return unchanged();
+  const remaining = listTemplatePrompts(validated.doc);
   return {
-    reply,
+    reply: composeReply(reply, leftOut, remaining),
     content: validated.doc,
     filled: applied.filled,
+    removed,
     edited: applied.edited,
-    remainingPrompts: listTemplatePrompts(validated.doc).length,
+    remainingPrompts: remaining.length,
   };
 }
 

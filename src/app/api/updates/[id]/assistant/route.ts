@@ -100,6 +100,7 @@ export const POST = withAdmin<P>(
               messages,
               content: result.content,
               filled: result.filled,
+              removed: result.removed,
               edited: result.edited,
               remainingPrompts: result.remainingPrompts,
             },

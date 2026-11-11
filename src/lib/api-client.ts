@@ -102,6 +102,39 @@ export async function apiStream(
   if (tail !== null) onEvent(tail);
 }
 
+/**
+ * POST JSON and get the response back as a file, e.g. a PDF rendered from unsaved editor
+ * content. Errors come back as the same ApiError the JSON helper throws.
+ */
+export async function postForFile(path: string, body: unknown, signal?: AbortSignal): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrfToken() },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+    cache: "no-store",
+    signal,
+  });
+  if (!res.ok) {
+    const json = safeParse(await res.text()) as { error?: { code?: string; message?: string } } | null;
+    throw new ApiError(res.status, json?.error?.code ?? "error", json?.error?.message ?? `Download failed (${res.status})`);
+  }
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(res.headers.get("content-disposition") ?? "")?.[1];
+  return { blob: await res.blob(), filename: encoded ? decodeURIComponent(encoded) : null };
+}
+
+/** Hand a Blob to the browser as a download. */
+export function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
 function safeParse(text: string): unknown {
   try {
     return JSON.parse(text);
