@@ -23,6 +23,7 @@ This document describes the **threat model** the code is built around and **cont
 - **Google** sign-in for real environments; **custom token** sign-in only when Auth emulator is used (dev-login path).
 - **TOTP MFA:** Required for session creation when `AUTH_REQUIRE_MFA` is true (`checkLoginToken` / `createSession` in `src/server/auth/session.ts`); production validation in `src/server/env.ts` requires it.
 - **HTTP-only session cookie** (`__session`) with `sameSite: strict`; CSRF token is a **separate, non-httpOnly** cookie echoed in header `x-csrf-token` for writes.
+- **Session check cache:** a successful session check (revocation + allowlist) is reused for 60 seconds per warm server instance (`SESSION_CHECK_CACHE_MS`). Revoking a session or removing an admin therefore takes effect within 60 seconds rather than on the next request. Failed checks are never cached, and signing out clears the entry on the instance that handled it.
 
 ### Abuse prevention
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { DecodedIdToken } from "firebase-admin/auth";
@@ -75,8 +75,11 @@ export async function createSession(idToken: string): Promise<{ cookie: string; 
     throw forbidden("Two-factor authentication is required.");
   }
   const expiresIn = env().SESSION_MAX_AGE_HOURS * 60 * 60 * 1000;
-  const cookie = await adminAuth().createSessionCookie(idToken, { expiresIn });
-  await bindAdminUid(check.email, check.decoded.uid);
+  // Independent calls: mint the cookie and record the login at the same time.
+  const [cookie] = await Promise.all([
+    adminAuth().createSessionCookie(idToken, { expiresIn }),
+    bindAdminUid(check.email, check.decoded.uid),
+  ]);
   return { cookie, csrf: randomBytes(24).toString("base64url"), email: check.email };
 }
 
@@ -100,9 +103,47 @@ export function csrfCookieOptions(maxAgeSeconds: number) {
   };
 }
 
+/**
+ * A full session check costs two network calls (Firebase Auth for revocation, Firestore for
+ * the allowlist). Successful checks are reused for SESSION_CHECK_CACHE_MS per warm instance,
+ * so a revoked session or a removed admin keeps access for at most that long. Failed checks
+ * are never cached, and signing out clears the entry immediately on this instance.
+ */
+export const SESSION_CHECK_CACHE_MS = 60_000;
+const SESSION_CACHE_MAX_ENTRIES = 500;
+const sessionCache = new Map<string, { at: number; session: AdminSession }>();
+
+function sessionCacheKey(cookieValue: string): string {
+  return createHash("sha256").update(cookieValue).digest("base64url");
+}
+
+function cacheSession(key: string, session: AdminSession) {
+  const now = Date.now();
+  if (sessionCache.size >= SESSION_CACHE_MAX_ENTRIES) {
+    for (const [k, v] of sessionCache) if (now - v.at >= SESSION_CHECK_CACHE_MS) sessionCache.delete(k);
+    if (sessionCache.size >= SESSION_CACHE_MAX_ENTRIES) sessionCache.clear();
+  }
+  sessionCache.set(key, { at: now, session });
+}
+
+export function clearSessionCache() {
+  sessionCache.clear();
+}
+
 /** Verify the session cookie (including revocation) and the live allowlist entry. */
 export async function verifySession(cookieValue: string | undefined): Promise<AdminSession | null> {
   if (!cookieValue) return null;
+  const key = sessionCacheKey(cookieValue);
+  const hit = sessionCache.get(key);
+  if (hit && Date.now() - hit.at < SESSION_CHECK_CACHE_MS) return hit.session;
+  if (hit) sessionCache.delete(key);
+
+  const session = await verifySessionUncached(cookieValue);
+  if (session) cacheSession(key, session);
+  return session;
+}
+
+async function verifySessionUncached(cookieValue: string): Promise<AdminSession | null> {
   let decoded: DecodedIdToken;
   try {
     decoded = await adminAuth().verifySessionCookie(cookieValue, true);
@@ -130,6 +171,7 @@ export async function requireAdminPage(): Promise<AdminSession> {
 
 export async function revokeSession(cookieValue: string | undefined) {
   if (!cookieValue) return;
+  sessionCache.delete(sessionCacheKey(cookieValue));
   try {
     const decoded = await adminAuth().verifySessionCookie(cookieValue);
     await adminAuth().revokeRefreshTokens(decoded.sub);
