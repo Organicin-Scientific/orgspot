@@ -75,7 +75,7 @@ describe("a drafting turn from a document", () => {
     expect(result.removed).toBe(4);
     expect(result.reply).toContain("Not used from the attachment:\n- Financial note");
     // Two metric cards and the R&D name and body had nothing in the doc; they're named, not hidden.
-    expect(result.reply).toContain("Still to fill:\n- cash received YTD");
+    expect(result.reply).toContain("Still to fill:\n- Revenue YTD from Mercury");
     expect(result.remainingPrompts).toBe(listTemplatePrompts(result.content!).length);
   });
 

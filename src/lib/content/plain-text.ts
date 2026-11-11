@@ -1,4 +1,5 @@
 import type { BlockNode, DocNode, InlineNode } from "./schema";
+import { metricDisplayValue } from "./template";
 
 function inlineText(nodes: InlineNode[] | undefined, withLinks: boolean): string {
   if (!nodes) return "";
@@ -43,7 +44,7 @@ function blockText(node: BlockNode, indent: string, withLinks: boolean): string 
         .join("\n");
     case "metrics":
       return node.attrs.items
-        .map((m) => `${m.label}${m.sublabel ? ` (${m.sublabel})` : ""}: ${m.value}`)
+        .map((m) => `${m.label}${m.sublabel ? ` (${m.sublabel})` : ""}: ${metricDisplayValue(m)}`)
         .join("\n");
     case "image":
       return node.attrs.alt ? `[Image: ${node.attrs.alt}]` : "";

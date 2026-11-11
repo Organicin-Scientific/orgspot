@@ -1,7 +1,7 @@
 import "server-only";
 import { FieldValue, Timestamp, type DocumentSnapshot, type Query } from "firebase-admin/firestore";
 import { EMPTY_DOC, parseDoc, type DocNode } from "@/lib/content/schema";
-import { starterDocument } from "@/lib/content/template";
+import { migrateLegacyMetrics, starterDocument } from "@/lib/content/template";
 import type { ContentBlock, Page, PdfDelivery, UpdateDoc, UpdateRevision, UpdateStatus, UpdateSummary } from "@/lib/types";
 import { db } from "../firebase-admin";
 import { badRequest, conflict, notFound } from "../http/errors";
@@ -18,6 +18,12 @@ function contentOf(raw: unknown): DocNode {
   return parsed.ok ? parsed.doc : EMPTY_DOC;
 }
 
+/** Drafts still on the retired metrics strip open with the standing strip and its prompts. Sent updates keep what went out. */
+function editableContentOf(raw: unknown, status: UpdateStatus): DocNode {
+  const doc = contentOf(raw);
+  return EDITABLE.includes(status) ? migrateLegacyMetrics(doc) : doc;
+}
+
 export function toUpdate(snap: DocumentSnapshot): UpdateDoc {
   const d = data(snap);
   return {
@@ -25,7 +31,7 @@ export function toUpdate(snap: DocumentSnapshot): UpdateDoc {
     title: str(d.title),
     subject: str(d.subject),
     previewText: str(d.previewText),
-    content: contentOf(d.content),
+    content: editableContentOf(d.content, (d.status as UpdateStatus) ?? "draft"),
     bannerAssetId: typeof d.bannerAssetId === "string" ? d.bannerAssetId : null,
     attachmentIds: Array.isArray(d.attachmentIds) ? (d.attachmentIds as string[]) : [],
     pdfDelivery: (d.pdfDelivery as PdfDelivery) ?? "attach",
@@ -302,7 +308,7 @@ export async function listBlocks(): Promise<ContentBlock[]> {
   return snap.docs.map((d) => ({
     id: d.id,
     name: str(d.get("name")),
-    content: contentOf(d.get("content")),
+    content: migrateLegacyMetrics(contentOf(d.get("content"))),
     createdAt: isoRequired(d.get("createdAt")),
     createdBy: str(d.get("createdBy")),
   }));

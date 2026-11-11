@@ -77,10 +77,17 @@ const heading = z.object({
   content: inlineContent,
 });
 
+/** Monthly customer cash behind the Revenue YTD chart (see lib/content/revenue-chart.ts). */
+const revenueChart = z.object({
+  year: z.number().int().min(2000).max(2100),
+  months: z.array(z.number().finite().min(0).max(1e11)).min(1).max(12),
+});
+
 export const metricItem = z.object({
   label: z.string().max(80),
   sublabel: z.string().max(120).default(""),
   value: z.string().max(40),
+  chart: revenueChart.optional(),
 });
 export type MetricItem = z.infer<typeof metricItem>;
 

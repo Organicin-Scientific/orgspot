@@ -11,7 +11,9 @@ import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewP
 import StarterKit from "@tiptap/starter-kit";
 import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
-import { isStandingMetrics, STANDING_METRICS } from "@/lib/content/template";
+import { chartTotal, formatShortUsd, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { isStandingMetrics, METRIC_PROMPTS, PROMPT_OPEN, standingPromptItems } from "@/lib/content/template";
+import { MonthlyFiguresPopover, RevenueChartGraphic } from "./revenue-chart-card";
 import { cn } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -34,6 +36,20 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
   const standard = isStandingMetrics(items);
   const setValue = (i: number, value: string) =>
     updateAttributes({ items: items.map((it, j) => (j === i ? { ...it, value } : it)) });
+  // The Revenue YTD headline is the chart's total, written into `value` whenever the figures change.
+  const setChart = (i: number, chart: RevenueChart | undefined) =>
+    updateAttributes({
+      items: items.map((it, j) => {
+        if (j !== i) return it;
+        if (!chart) {
+          const { chart: _drop, ...rest } = it;
+          void _drop;
+          return { ...rest, value: `${PROMPT_OPEN}${METRIC_PROMPTS[0]}]` };
+        }
+        return { ...it, chart, value: formatShortUsd(chartTotal(chart)) };
+      }),
+    });
+  const columns = items.map((it) => (it.label === REVENUE_YTD_LABEL ? "minmax(0,1.6fr)" : "minmax(0,1fr)")).join(" ");
 
   // Labels and basis lines are fixed (see STANDING_METRICS) so the strip stays comparable
   // quarter to quarter. Only values are editable here.
@@ -43,12 +59,15 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
       data-type="metrics"
       contentEditable={false}
     >
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: columns }}>
         {items.map((it, i) => (
           <div
             key={i}
             className="rounded-[10px] border border-[#e3e8e6] bg-[#f6f8f7] px-3 pt-4 pb-3.5 text-center transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-[var(--doc-brand)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--doc-brand)_14%,transparent)]"
           >
+            {it.label === REVENUE_YTD_LABEL ? (
+              <RevenueHeadline item={it} />
+            ) : (
             <MetricInput
               value={it.value}
               placeholder="Value"
@@ -58,8 +77,21 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
               onChange={(v) => setValue(i, v)}
               ariaLabel={`${it.label || `Metric ${i + 1}`} value`}
             />
+            )}
             <p className="mt-1.5 select-none text-[13px] font-semibold">{it.label}</p>
             {it.sublabel ? <p className="mt-px select-none text-[12px] text-[#6b7280]">{it.sublabel}</p> : null}
+            {it.label === REVENUE_YTD_LABEL ? (
+              <div className="flex flex-col items-center">
+                {hasChartData(it.chart) ? <RevenueChartGraphic chart={it.chart} className="mx-auto mt-3" /> : null}
+                <MonthlyFiguresPopover
+                  key={JSON.stringify(it.chart ?? null)}
+                  chart={it.chart}
+                  disabled={!editable}
+                  onSave={(chart) => setChart(i, chart)}
+                  onClear={() => setChart(i, undefined)}
+                />
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -68,7 +100,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
           <button
             type="button"
             className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0]"
-            onClick={() => updateAttributes({ items: standingItems() })}
+            onClick={() => updateAttributes({ items: standingPromptItems() })}
           >
             <RotateCcw className="size-3" /> Use standard metrics
           </button>
@@ -78,10 +110,31 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
   );
 }
 
-/** A fresh standing strip with empty values. */
-function standingItems(): MetricItem[] {
-  return STANDING_METRICS.map((m) => ({ ...m, value: "" }));
+/**
+ * Revenue YTD's headline is not typed: it is the total of the monthly figures. Until they're
+ * entered the card shows its prompt, which blocks investor sends like any other.
+ */
+function RevenueHeadline({ item }: { item: MetricItem }) {
+  if (hasChartData(item.chart)) {
+    return (
+      <p className="select-none text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]">
+        {formatShortUsd(chartTotal(item.chart))}
+      </p>
+    );
+  }
+  const isPrompt = item.value.includes(PROMPT_OPEN);
+  return (
+    <p
+      className={cn(
+        "select-none leading-tight",
+        isPrompt ? "py-1.5 text-[13px] italic text-[#9aa3a0]" : "text-[26px] font-bold tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]",
+      )}
+    >
+      {item.value || "Value"}
+    </p>
+  );
 }
+
 
 function MetricInput({
   value,
@@ -123,7 +176,7 @@ export const Metrics = Node.create({
   addAttributes() {
     return {
       items: {
-        default: STANDING_METRICS.map((m) => ({ ...m, value: "" })),
+        default: standingPromptItems(),
         parseHTML: (el) => {
           try {
             return JSON.parse(el.getAttribute("data-items") ?? "[]");
