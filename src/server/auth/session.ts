@@ -111,7 +111,7 @@ export async function verifySession(cookieValue: string | undefined): Promise<Ad
   }
   if (!decoded.email || decoded.email_verified !== true) return null;
   const email = normalizeEmail(decoded.email);
-  const admin = await getAdmin(email);
+  const admin = await getAdmin(email, { fresh: true });
   if (!admin) return null;
   return { uid: decoded.uid, email };
 }

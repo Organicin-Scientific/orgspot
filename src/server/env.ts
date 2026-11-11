@@ -77,9 +77,20 @@ export type Env = z.infer<typeof schema> & {
 
 let cached: Env | null = null;
 
+/** Resolve canonical app URL. Preview deployments may omit APP_URL and use Vercel's injected host. */
+function resolveAppUrlInput(): Record<string, string | undefined> {
+  const base = { ...process.env };
+  if (base.APP_URL?.trim()) return base;
+  const vercelUrl = base.VERCEL_URL?.trim();
+  if (vercelUrl && (base.VERCEL_ENV === "preview" || base.APP_ENV === "preview")) {
+    base.APP_URL = vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
+  }
+  return base;
+}
+
 export function env(): Env {
   if (cached) return cached;
-  const parsed = schema.safeParse(process.env);
+  const parsed = schema.safeParse(resolveAppUrlInput());
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid server environment:\n${issues.join("\n")}`);

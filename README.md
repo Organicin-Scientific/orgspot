@@ -13,7 +13,7 @@ Internal admin app for **Organicin Scientific** investor communications: maintai
 | Rich content | Tiptap, Zod-validated content schema |
 | PDF | `@react-pdf/renderer` |
 
-Further reading: [Deployment](docs/deployment.md), [Security](docs/security.md), [Data model](docs/data-model.md), [Backup & recovery](docs/backup-recovery.md), [Email testing](docs/email-testing.md).
+Further reading: [Environments](docs/environments.md), [Operations](docs/operations.md), [Deployment](docs/deployment.md), [Security](docs/security.md), [Data model](docs/data-model.md), [Backup & recovery](docs/backup-recovery.md), [Email testing](docs/email-testing.md), [AI drafting](docs/ai-drafting.md). Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Local development (Firebase emulators)
 
