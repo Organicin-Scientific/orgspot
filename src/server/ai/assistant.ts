@@ -1,6 +1,13 @@
 import "server-only";
-import { SchemaType, VertexAI, type Content, type Part } from "@google-cloud/vertexai";
+import { SchemaType, VertexAI, type Content, type GenerationConfig, type Part } from "@google-cloud/vertexai";
 import { z } from "zod";
+import {
+  clampLabel,
+  describeHit,
+  promptBlockIndex,
+  ResponseScanner,
+  thoughtHeadlines,
+} from "@/lib/content/assistant-progress";
 import {
   applyAssistantChanges,
   ASSISTANT_BLOCK_TYPES,
@@ -131,7 +138,10 @@ export async function runAssistantTurn(opts: {
   history: AssistantMessage[];
   message: string;
   source: SourceAttachment | null;
+  /** Called with a short label each time the turn moves on, for the chat's live ticker. */
+  onStep?: (label: string) => void;
 }): Promise<AssistantTurnResult> {
+  const step = (label: string) => opts.onStep?.(clampLabel(label));
   if (!aiDraftConfigured()) {
     throw serviceUnavailable("The assistant is not configured. Enable Vertex AI and set AI_DRAFT_ENABLED=true.");
   }
@@ -154,7 +164,10 @@ export async function runAssistantTurn(opts: {
       maxOutputTokens: 16_384,
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
-    },
+      // Thought summaries stream ahead of the answer and become the ticker's headlines.
+      // The SDK's types predate this field; Vertex accepts it for thinking models.
+      thinkingConfig: { includeThoughts: true },
+    } as GenerationConfig,
   });
 
   const prompts = listTemplatePrompts(opts.doc);
@@ -179,17 +192,26 @@ export async function runAssistantTurn(opts: {
   const parts: Part[] = [{ text: turnText }];
   if (opts.source?.kind === "pdf") parts.push({ inlineData: { mimeType: opts.source.mimeType, data: opts.source.base64 } });
 
-  let raw = "";
+  const promptBlocks = promptBlockIndex(opts.doc);
+  const scanner = new ScanTracker(opts.doc, promptBlocks, step);
+  step(prompts.length ? `Sending the draft and ${prompts.length} open prompt${prompts.length === 1 ? "" : "s"} to Gemini` : "Sending the draft to Gemini");
+
   try {
-    const result = await model.generateContent({ contents: [...historyContents(opts.history), { role: "user", parts }] });
-    raw =
-      result.response.candidates?.[0]?.content?.parts
-        ?.map((p) => ("text" in p && typeof p.text === "string" ? p.text : ""))
-        .join("") ?? "";
+    const result = await model.generateContentStream({ contents: [...historyContents(opts.history), { role: "user", parts }] });
+    step("Gemini is reading");
+    for await (const chunk of result.stream) {
+      for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+        const text = "text" in part && typeof part.text === "string" ? part.text : "";
+        if (!text) continue;
+        if ((part as { thought?: boolean }).thought) scanner.thought(text);
+        else scanner.answer(text);
+      }
+    }
   } catch (err) {
     log.error("assistant.gemini_failed", { error: err instanceof Error ? err.message : String(err) });
     throw serviceUnavailable("Gemini didn't respond. Try again in a moment.");
   }
+  const raw = scanner.text;
   if (!raw.trim()) throw badRequest("Gemini returned an empty response. Try again or shorten the attachment.");
 
   let json: unknown;
@@ -214,6 +236,7 @@ export async function runAssistantTurn(opts: {
     return { reply, content: null, filled: 0, edited: 0, remainingPrompts: prompts.length };
   }
 
+  step("Checking the changes fit the template");
   const applied = applyAssistantChanges(opts.doc, fills, edits);
   const validated = parseDoc(applied.doc);
   if (!validated.ok) {
@@ -230,4 +253,34 @@ export async function runAssistantTurn(opts: {
     edited: applied.edited,
     remainingPrompts: listTemplatePrompts(validated.doc).length,
   };
+}
+
+/** Turns streamed thought and answer text into ticker steps, and keeps the answer for parsing. */
+class ScanTracker {
+  private readonly answerScan = new ResponseScanner();
+  private thoughts = "";
+  private headlinesSent = 0;
+
+  constructor(
+    private readonly doc: DocNode,
+    private readonly promptBlocks: Map<number, number>,
+    private readonly step: (label: string) => void,
+  ) {}
+
+  get text(): string {
+    return this.answerScan.text;
+  }
+
+  thought(text: string) {
+    this.thoughts += text;
+    const heads = thoughtHeadlines(this.thoughts);
+    for (; this.headlinesSent < heads.length; this.headlinesSent++) this.step(heads[this.headlinesSent]!);
+  }
+
+  answer(text: string) {
+    for (const hit of this.answerScan.push(text)) {
+      const label = describeHit(hit, this.doc, this.promptBlocks);
+      if (label) this.step(label);
+    }
+  }
 }

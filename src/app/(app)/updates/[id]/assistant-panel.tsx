@@ -5,9 +5,11 @@ import { ArrowUp, Check, FileText, Loader2, Paperclip, Sparkles, Trash2, X } fro
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { api, errorMessage } from "@/lib/api-client";
+import { api, ApiError, apiStream, errorMessage } from "@/lib/api-client";
+import type { AssistantStreamEvent } from "@/lib/content/assistant-progress";
 import type { DocNode } from "@/lib/content/schema";
 import type { AssistantMessage } from "@/lib/types";
+import { AssistantTicker } from "./assistant-ticker";
 
 type TurnResponse = {
   messages: AssistantMessage[];
@@ -17,7 +19,7 @@ type TurnResponse = {
   remainingPrompts: number;
 };
 
-type Pending = { text: string; fileName: string | null };
+type Pending = { text: string; fileName: string | null; startedAt: number };
 
 const ACCEPT = ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown";
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
@@ -56,6 +58,7 @@ export function AssistantPanel({
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [steps, setSteps] = useState<string[]>([]);
   const [clearOpen, setClearOpen] = useState(false);
   // Only replies that arrive while the panel is open animate in; saved history and the
   // author's own message (sent with Enter) appear instantly.
@@ -107,7 +110,8 @@ export function AssistantPanel({
       toast.error("Save your changes before asking the assistant.");
       return;
     }
-    setPending({ text: message, fileName: attached?.name ?? null });
+    setPending({ text: message, fileName: attached?.name ?? null, startedAt: Date.now() });
+    setSteps([]);
     setText("");
     setFile(null);
     onWorkingChange(true);
@@ -116,10 +120,19 @@ export function AssistantPanel({
       form.set("content", JSON.stringify(getContent()));
       if (message) form.set("message", message);
       if (attached) form.set("file", attached);
-      const res = await api<TurnResponse>(`/api/updates/${updateId}/assistant`, { form });
-      if (res.content) await onApply(res.content);
-      setLiveReplies((ids) => new Set([...ids, ...res.messages.filter((m) => m.role === "assistant").map((m) => m.id)]));
-      setMessages((m) => [...(m ?? []), ...res.messages]);
+      // Assigned inside the event callback, which control-flow narrowing does not see.
+      let res = null as TurnResponse | null;
+      await apiStream(`/api/updates/${updateId}/assistant`, form, (raw) => {
+        const event = raw as AssistantStreamEvent;
+        if (event.type === "step") setSteps((all) => [...all, event.label]);
+        else if (event.type === "done") res = event.result as TurnResponse;
+        else if (event.type === "error") throw new ApiError(event.status, "assistant_error", event.message);
+      });
+      if (!res) throw new ApiError(502, "assistant_error", "The assistant stopped before finishing. Try again.");
+      const turn: TurnResponse = res;
+      if (turn.content) await onApply(turn.content);
+      setLiveReplies((ids) => new Set([...ids, ...turn.messages.filter((m) => m.role === "assistant").map((m) => m.id)]));
+      setMessages((m) => [...(m ?? []), ...turn.messages]);
     } catch (err) {
       // Give the author their message back so nothing they typed is lost.
       setText(message);
@@ -180,12 +193,7 @@ export function AssistantPanel({
             {pending && (
               <>
                 <MessageItem message={{ role: "user", text: pending.text, fileName: pending.fileName, changeSummary: null }} animate={false} />
-                <li className={`flex items-center gap-2 text-sm text-muted-foreground ${ENTER}`}>
-                  <span className="flex size-6 items-center justify-center rounded-full bg-brand/10 text-brand">
-                    <Sparkles className="size-3.5" />
-                  </span>
-                  <span className="assistant-thinking">{pending.fileName ? "Reading and drafting" : "Drafting"}</span>
-                </li>
+                <AssistantTicker steps={steps} startedAt={pending.startedAt} />
               </>
             )}
           </ol>
