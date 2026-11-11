@@ -4,8 +4,8 @@ import { proxy } from "@/proxy";
 
 function req(path: string, cookie?: string) {
   const url = new URL(path, "https://investor.example.com");
-  const init: RequestInit = { headers: cookie ? { cookie: `__session=${cookie}` } : {} };
-  return new NextRequest(url, init);
+  if (cookie) return new NextRequest(url, { headers: { cookie: `__session=${cookie}` } });
+  return new NextRequest(url);
 }
 
 describe("proxy", () => {
