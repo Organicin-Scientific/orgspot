@@ -14,7 +14,7 @@ import type { AssistantMessage } from "@/lib/types";
 import { env } from "../env";
 import { badRequest, serviceUnavailable } from "../http/errors";
 import { log } from "../logger";
-import { aiDraftConfigured, DEFAULT_GEMINI_MODEL, DEFAULT_VERTEX_LOCATION, vertexServiceAccount } from "./config";
+import { aiDraftConfigured, DEFAULT_GEMINI_MODEL, vertexApiEndpoint, vertexLocation, vertexServiceAccount } from "./config";
 import type { SourceAttachment } from "./source-text";
 import { FACT_RULES, VOICE_RULES } from "./voice";
 
@@ -139,9 +139,11 @@ export async function runAssistantTurn(opts: {
   if (!credentials) throw serviceUnavailable("Vertex credentials are not configured.");
 
   const e = env();
+  const location = vertexLocation();
   const vertex = new VertexAI({
     project: e.FIREBASE_PROJECT_ID,
-    location: e.VERTEX_GEMINI_LOCATION || DEFAULT_VERTEX_LOCATION,
+    location,
+    apiEndpoint: vertexApiEndpoint(location),
     googleAuthOptions: { credentials },
   });
   const model = vertex.getGenerativeModel({

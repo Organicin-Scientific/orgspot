@@ -12,7 +12,7 @@ Production on the **orgspot** Vercel project should include:
 |----------|--------|
 | `AI_DRAFT_ENABLED` | `true` |
 | `GEMINI_MODEL` | `gemini-3.8-flash` |
-| `VERTEX_GEMINI_LOCATION` | `us-central1` |
+| `VERTEX_GEMINI_LOCATION` | `global` (Gemini 3.8 Flash is not served in single regions such as `us-central1`) |
 
 No new secrets are required: the app reuses **`FIREBASE_CLIENT_EMAIL`** and **`FIREBASE_PRIVATE_KEY`** (same as Firestore Admin).
 
@@ -49,7 +49,7 @@ In [Google Cloud Console](https://console.cloud.google.com/):
 
 1. Open an editable update on production → the **Assistant** tab should accept messages.
 2. Paste short quarter notes or attach a document and send. The document updates and the reply says what changed.
-3. If it fails with permission errors, confirm IAM and that the model id `gemini-3.8-flash` is available in `us-central1`.
+3. If it fails with a 404 "publisher model not found", the location is wrong: use `global` (the app passes the matching endpoint). Permission errors point to IAM.
 
 ## Data handling
 

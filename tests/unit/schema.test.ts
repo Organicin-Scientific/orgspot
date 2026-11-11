@@ -5,6 +5,7 @@ describe("isSafeHref", () => {
   it("accepts http, https, and mailto", () => {
     expect(isSafeHref("https://example.com/path")).toBe(true);
     expect(isSafeHref("http://localhost:3000/")).toBe(true);
+    expect(isSafeHref("http://example.com/")).toBe(false);
     expect(isSafeHref("mailto:a@b.co")).toBe(true);
   });
 

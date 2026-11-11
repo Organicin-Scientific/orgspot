@@ -40,6 +40,12 @@ function buildCsp(nonce: string) {
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // Proxied Firebase Auth pages load scripts from gstatic; the app CSP breaks sign-in popups and helper iframes.
+  if (pathname === "/__/auth" || pathname.startsWith("/__/auth/")) {
+    return NextResponse.next();
+  }
+
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p));
   if (!isPublic && !request.cookies.has("__session")) {
     const url = request.nextUrl.clone();

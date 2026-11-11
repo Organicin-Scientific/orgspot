@@ -30,7 +30,10 @@ export function isSafeHref(href: string): boolean {
   if (v.length === 0 || v.length > 2048) return false;
   try {
     const u = new URL(v);
-    return u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:";
+    if (u.protocol === "mailto:") return true;
+    if (u.protocol === "https:") return true;
+    if (u.protocol === "http:") return u.hostname === "localhost" || u.hostname === "127.0.0.1";
+    return false;
   } catch {
     return false;
   }

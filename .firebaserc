@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-organicin"
+    "default": "demo-organicin",
+    "production": "orgspot-afbf7"
   }
 }

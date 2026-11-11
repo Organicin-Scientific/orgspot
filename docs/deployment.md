@@ -48,7 +48,7 @@ Variables are defined in `.env.example` and validated in `src/server/env.ts`. Be
 | `PDF_LINK_TTL_DAYS` | Expiry for signed download links | Default 30 |
 | `AI_DRAFT_ENABLED` | Vertex Gemini template drafting in the update editor | Default false; needs service account + Vertex AI API |
 | `GEMINI_MODEL` | Vertex model id | Default `gemini-3.8-flash` |
-| `VERTEX_GEMINI_LOCATION` | Vertex region | Default `us-central1` |
+| `VERTEX_GEMINI_LOCATION` | Vertex location | Default `global`. Gemini 3.8 Flash is served from `global`, `us` and `eu`, not single regions such as `us-central1` |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Client Firebase config | Public |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Client auth domain | Often set to the **app’s own domain** in production (see below) |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Client project id | Public |
@@ -74,7 +74,7 @@ firebase deploy --only firestore:rules,firestore:indexes,storage --project <proj
 
 ### Auth domain and rewrites
 
-`next.config.ts` rewrites `/_/auth/*` to `https://<NEXT_PUBLIC_FIREBASE_PROJECT_ID>.firebaseapp.com/_/auth/*` so Firebase Auth can use your **app hostname** as `authDomain` and avoid third-party cookie issues.
+`next.config.ts` rewrites `/__/auth/*` to `https://<NEXT_PUBLIC_FIREBASE_PROJECT_ID>.firebaseapp.com/__/auth/*` so Firebase Auth can use your **app hostname** as `authDomain` and avoid third-party cookie issues.
 
 Set **`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`** to your deployed hostname (for example `investor.organicinscientific.com`), not only the default `*.firebaseapp.com` domain, when following this pattern.
 
@@ -107,9 +107,13 @@ npm run admin -- add you@company.com
 
 Use `list` and `remove` per the script header in `scripts/admin.ts`.
 
+## Vercel Preview environment variables
+
+Preview deploys need the same Firebase and signing secrets as Production (enable **Preview** on each secret in the Vercel dashboard), plus Preview-specific overrides documented in [environments.md](./environments.md). Set `APP_ENV=preview`, `EMAIL_SENDING_ENABLED=false`, and `AI_DRAFT_ENABLED=false` on Preview. `APP_URL` may be omitted; the app derives it from `VERCEL_URL` on Preview.
+
 ## Vercel Cron
 
-`vercel.json` schedules a **once-daily** cron (Hobby plan limit), at **11:00 UTC** (~6:00 US Eastern):
+`vercel.json` schedules a **once-daily** cron (Hobby plan limit), at **11:00 UTC** (~6:00 US Eastern). See [operations.md](./operations.md) for how this relates to GitHub’s 10-minute worker.
 
 - **Path:** `GET /api/internal/worker`
 - **Authorisation:** `Authorization: Bearer <CRON_SECRET>` (compare `src/app/api/internal/worker/route.ts`)

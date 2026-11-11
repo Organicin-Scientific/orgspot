@@ -33,7 +33,8 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // Pages get frame-ancestors 'none' from the proxy CSP; API responses (PDF previews) may be framed by the app itself.
       { source: "/api/:path*", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
-      { source: "/((?!api).*)", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
+      // Firebase helper iframe must load inside /login when authDomain is this hostname.
+      { source: "/((?!api|__/auth).*)", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
     ];
   },
   async rewrites() {
