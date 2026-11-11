@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { parseDoc } from "../../src/lib/content/schema";
-import { countPromptMarkers, OPTIONAL_SECTIONS, PROMPT_OPEN, starterDocument, templatePromptCount } from "../../src/lib/content/template";
+import {
+  countPromptMarkers,
+  isStandingMetrics,
+  OPTIONAL_SECTIONS,
+  PROMPT_OPEN,
+  STANDING_METRICS,
+  starterDocument,
+  templatePromptCount,
+} from "../../src/lib/content/template";
 
 describe("template documents", () => {
   it("starterDocument passes parseDoc", () => {
@@ -56,6 +64,14 @@ describe("template prompts", () => {
       ["Contracted backlog", "signed, not yet collected"],
       ["Pipeline", "proposed, not yet signed"],
     ]);
+  });
+
+  it("recognises the standing strip and rejects renamed, missing or extra cards", () => {
+    const std = STANDING_METRICS.map((m) => ({ ...m, value: "$1" }));
+    expect(isStandingMetrics(std)).toBe(true);
+    expect(isStandingMetrics(std.slice(0, 2))).toBe(false);
+    expect(isStandingMetrics([...std, { label: "Runway", sublabel: "", value: "" }])).toBe(false);
+    expect(isStandingMetrics(std.map((m, i) => (i === 2 ? { ...m, label: "Pipeline (2Q)" } : m)))).toBe(false);
   });
 
   it("opens with the current company description and the 2026 section order", () => {

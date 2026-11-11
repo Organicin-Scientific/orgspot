@@ -38,6 +38,27 @@ const bullets = (...items: ReturnType<typeof t>[][]): BlockNode => ({
 export const WHAT_WE_DO =
   " Organicin Scientific discovers and develops bacteriocins (antimicrobial proteins that inhibit specific pathogens) to prevent disease and improve microbiome health.";
 
+/**
+ * The standing metrics strip. Labels and basis lines are fixed so investors can compare
+ * quarters; only values change. Every dollar sits in exactly one card: it moves from
+ * Pipeline to Contracted backlog when a contract is signed, then to Revenue YTD when cash arrives.
+ */
+export const STANDING_METRICS: readonly { label: string; sublabel: string }[] = [
+  { label: "Revenue YTD", sublabel: "cash received since Jan 1" },
+  { label: "Contracted backlog", sublabel: "signed, not yet collected" },
+  { label: "Pipeline", sublabel: "proposed, not yet signed" },
+];
+
+/** True when a strip carries exactly the standing labels, in order. */
+export function isStandingMetrics(items: readonly { label: string; sublabel: string }[]): boolean {
+  return (
+    items.length === STANDING_METRICS.length &&
+    items.every((it, i) => it.label === STANDING_METRICS[i].label && it.sublabel === STANDING_METRICS[i].sublabel)
+  );
+}
+
+const METRIC_PROMPTS = ["cash received YTD", "uncollected contract value", "open proposals"];
+
 export function starterDocument(): DocNode {
   return {
     type: "doc",
@@ -55,11 +76,7 @@ export function starterDocument(): DocNode {
       {
         type: "metrics",
         attrs: {
-          items: [
-            { label: "Revenue YTD", sublabel: "cash received since Jan 1", value: `${PROMPT_OPEN}cash received YTD]` },
-            { label: "Contracted backlog", sublabel: "signed, not yet collected", value: `${PROMPT_OPEN}uncollected contract value]` },
-            { label: "Pipeline", sublabel: "proposed, not yet signed", value: `${PROMPT_OPEN}open proposals]` },
-          ],
+          items: STANDING_METRICS.map((m, i) => ({ ...m, value: `${PROMPT_OPEN}${METRIC_PROMPTS[i]}]` })),
         },
       },
 

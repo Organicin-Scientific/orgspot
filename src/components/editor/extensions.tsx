@@ -9,8 +9,9 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Placeholder } from "@tiptap/extensions";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Minus, Plus } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
+import { isStandingMetrics, STANDING_METRICS } from "@/lib/content/template";
 import { cn } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -30,9 +31,12 @@ declare module "@tiptap/core" {
 function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps) {
   const items = (node.attrs.items as MetricItem[]) ?? [];
   const editable = editor.isEditable;
-  const set = (i: number, patch: Partial<MetricItem>) =>
-    updateAttributes({ items: items.map((it, j) => (j === i ? { ...it, ...patch } : it)) });
+  const standard = isStandingMetrics(items);
+  const setValue = (i: number, value: string) =>
+    updateAttributes({ items: items.map((it, j) => (j === i ? { ...it, value } : it)) });
 
+  // Labels and basis lines are fixed (see STANDING_METRICS) so the strip stays comparable
+  // quarter to quarter. Only values are editable here.
   return (
     <NodeViewWrapper
       className={cn("my-4 rounded-md", selected && "ring-2 ring-[var(--doc-brand)] ring-offset-2")}
@@ -51,52 +55,32 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
               disabled={!editable}
               className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]"
               maxLength={40}
-              onChange={(v) => set(i, { value: v })}
-              ariaLabel={`Metric ${i + 1} value`}
+              onChange={(v) => setValue(i, v)}
+              ariaLabel={`${it.label || `Metric ${i + 1}`} value`}
             />
-            <MetricInput
-              value={it.label}
-              placeholder="Label"
-              disabled={!editable}
-              className="mt-1.5 text-[13px] font-semibold"
-              maxLength={80}
-              onChange={(v) => set(i, { label: v })}
-              ariaLabel={`Metric ${i + 1} label`}
-            />
-            <MetricInput
-              value={it.sublabel}
-              placeholder="Detail (optional)"
-              disabled={!editable}
-              className="mt-px text-[12px] text-[#6b7280]"
-              maxLength={120}
-              onChange={(v) => set(i, { sublabel: v })}
-              ariaLabel={`Metric ${i + 1} detail`}
-            />
+            <p className="mt-1.5 select-none text-[13px] font-semibold">{it.label}</p>
+            {it.sublabel ? <p className="mt-px select-none text-[12px] text-[#6b7280]">{it.sublabel}</p> : null}
           </div>
         ))}
       </div>
-      {editable && (
-        <div className="mt-1.5 flex justify-end gap-1 font-sans text-xs text-[#666]">
+      {editable && !standard && (
+        <div className="mt-1.5 flex justify-end font-sans text-xs text-[#666]">
           <button
             type="button"
-            className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0] disabled:pointer-events-none disabled:opacity-40"
-            disabled={items.length <= 1}
-            onClick={() => updateAttributes({ items: items.slice(0, -1) })}
+            className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0]"
+            onClick={() => updateAttributes({ items: standingItems() })}
           >
-            <Minus className="size-3" /> Remove metric
-          </button>
-          <button
-            type="button"
-            className="pressable inline-flex items-center gap-1 rounded px-1.5 py-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0] disabled:pointer-events-none disabled:opacity-40"
-            disabled={items.length >= 4}
-            onClick={() => updateAttributes({ items: [...items, { label: "", sublabel: "", value: "" }] })}
-          >
-            <Plus className="size-3" /> Add metric
+            <RotateCcw className="size-3" /> Use standard metrics
           </button>
         </div>
       )}
     </NodeViewWrapper>
   );
+}
+
+/** A fresh standing strip with empty values. */
+function standingItems(): MetricItem[] {
+  return STANDING_METRICS.map((m) => ({ ...m, value: "" }));
 }
 
 function MetricInput({
@@ -139,11 +123,7 @@ export const Metrics = Node.create({
   addAttributes() {
     return {
       items: {
-        default: [
-          { label: "", sublabel: "", value: "" },
-          { label: "", sublabel: "", value: "" },
-          { label: "", sublabel: "", value: "" },
-        ],
+        default: STANDING_METRICS.map((m) => ({ ...m, value: "" })),
         parseHTML: (el) => {
           try {
             return JSON.parse(el.getAttribute("data-items") ?? "[]");
