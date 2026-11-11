@@ -49,52 +49,79 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
         return { ...it, chart, value: formatShortUsd(chartTotal(chart)) };
       }),
     });
-  const columns = items.map((it) => (it.label === REVENUE_YTD_LABEL ? "minmax(0,1.6fr)" : "minmax(0,1fr)")).join(" ");
+  // One ledger card: the hero figure (Revenue YTD, or the first card) with its chart in the
+  // header, the rest as rows beneath. Rows never need side-by-side columns, so the strip reads
+  // the same in the narrow editor column, a phone's mail app and the PDF.
+  const heroIndex = Math.max(0, items.findIndex((it) => it.label === REVENUE_YTD_LABEL));
+  const hero = items[heroIndex];
 
   // Labels and basis lines are fixed (see STANDING_METRICS) so the strip stays comparable
   // quarter to quarter. Only values are editable here.
   return (
     <NodeViewWrapper
-      className={cn("my-4 rounded-md", selected && "ring-2 ring-[var(--doc-brand)] ring-offset-2")}
+      className={cn("my-4 rounded-[12px]", selected && "ring-2 ring-[var(--doc-brand)] ring-offset-2")}
       data-type="metrics"
       contentEditable={false}
     >
-      <div className="grid gap-3" style={{ gridTemplateColumns: columns }}>
-        {items.map((it, i) => (
-          <div
-            key={i}
-            className="rounded-[10px] border border-[#e3e8e6] bg-[#f6f8f7] px-3 pt-4 pb-3.5 text-center transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-[var(--doc-brand)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--doc-brand)_14%,transparent)]"
-          >
-            {it.label === REVENUE_YTD_LABEL ? (
-              <RevenueHeadline item={it} />
-            ) : (
-            <MetricInput
-              value={it.value}
-              placeholder="Value"
-              disabled={!editable}
-              className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]"
-              maxLength={40}
-              onChange={(v) => setValue(i, v)}
-              ariaLabel={`${it.label || `Metric ${i + 1}`} value`}
-            />
-            )}
-            <p className="mt-1.5 select-none text-[13px] font-semibold">{it.label}</p>
-            {it.sublabel ? <p className="mt-px select-none text-[12px] text-[#6b7280]">{it.sublabel}</p> : null}
-            {it.label === REVENUE_YTD_LABEL ? (
-              <div className="flex flex-col items-center">
-                {hasChartData(it.chart) ? <RevenueChartGraphic chart={it.chart} className="mx-auto mt-3" /> : null}
-                <MonthlyFiguresPopover
-                  key={JSON.stringify(it.chart ?? null)}
-                  chart={it.chart}
+      {hero ? (
+        <div className="@container overflow-hidden rounded-[12px] border border-[#e3e8e6] bg-white">
+          <div className="flex flex-col gap-3 px-5 pt-4 pb-4 @[26rem]:flex-row @[26rem]:items-end @[26rem]:justify-between">
+            <div className="min-w-0">
+              <p className="select-none text-[12px] font-medium tracking-[0.01em] text-[#5b6561]">{hero.label}</p>
+              {hero.label === REVENUE_YTD_LABEL ? (
+                <RevenueHeadline item={hero} />
+              ) : (
+                <MetricInput
+                  value={hero.value}
+                  placeholder="Value"
                   disabled={!editable}
-                  onSave={(chart) => setChart(i, chart)}
-                  onClear={() => setChart(i, undefined)}
+                  align="left"
+                  className="mt-0.5 text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-[var(--doc-brand)]"
+                  maxLength={40}
+                  onChange={(v) => setValue(heroIndex, v)}
+                  ariaLabel={`${hero.label || "Metric"} value`}
+                />
+              )}
+              {hero.sublabel ? <p className="mt-0.5 select-none text-[12px] text-[#8a938f]">{hero.sublabel}</p> : null}
+            </div>
+            {hero.label === REVENUE_YTD_LABEL ? (
+              <div className="flex shrink-0 flex-col items-stretch @[26rem]:w-[46%] @[26rem]:max-w-[232px] @[26rem]:items-end">
+                {hasChartData(hero.chart) ? <RevenueChartGraphic chart={hero.chart} className="max-w-none @[26rem]:max-w-[232px]" /> : null}
+                <MonthlyFiguresPopover
+                  key={JSON.stringify(hero.chart ?? null)}
+                  chart={hero.chart}
+                  disabled={!editable}
+                  onSave={(chart) => setChart(heroIndex, chart)}
+                  onClear={() => setChart(heroIndex, undefined)}
                 />
               </div>
             ) : null}
           </div>
-        ))}
-      </div>
+          {items.map((it, i) =>
+            i === heroIndex ? null : (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-4 border-t border-[#eef1f0] px-5 py-3"
+              >
+                <div className="min-w-0 select-none">
+                  <p className="text-[13px] font-semibold leading-tight text-[#1f2623]">{it.label}</p>
+                  {it.sublabel ? <p className="mt-0.5 text-[12px] leading-tight text-[#8a938f]">{it.sublabel}</p> : null}
+                </div>
+                <MetricInput
+                  value={it.value}
+                  placeholder="Value"
+                  disabled={!editable}
+                  align="right"
+                  className="w-[9.5rem] shrink-0 px-1.5 py-0.5 text-[20px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[#1f2623] transition-[background-color,box-shadow] duration-150 ease-out placeholder:text-[13px] placeholder:font-normal focus:bg-white focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--doc-brand)_30%,transparent)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f6f8f7]"
+                  maxLength={40}
+                  onChange={(v) => setValue(i, v)}
+                  ariaLabel={`${it.label || `Metric ${i + 1}`} value`}
+                />
+              </div>
+            ),
+          )}
+        </div>
+      ) : null}
       {editable && !standard && (
         <div className="mt-1.5 flex justify-end font-sans text-xs text-[#666]">
           <button
@@ -117,7 +144,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
 function RevenueHeadline({ item }: { item: MetricItem }) {
   if (hasChartData(item.chart)) {
     return (
-      <p className="select-none text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]">
+      <p className="mt-0.5 select-none text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-[var(--doc-brand)]">
         {formatShortUsd(chartTotal(item.chart))}
       </p>
     );
@@ -126,8 +153,8 @@ function RevenueHeadline({ item }: { item: MetricItem }) {
   return (
     <p
       className={cn(
-        "select-none leading-tight",
-        isPrompt ? "py-1.5 text-[13px] italic text-[#9aa3a0]" : "text-[26px] font-bold tracking-[-0.01em] tabular-nums text-[var(--doc-brand)]",
+        "mt-0.5 select-none",
+        isPrompt ? "py-1.5 text-[13px] italic leading-tight text-[#9aa3a0]" : "text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-[var(--doc-brand)]",
       )}
     >
       {item.value || "Value"}
@@ -144,7 +171,9 @@ function MetricInput({
   disabled,
   maxLength,
   ariaLabel,
+  align = "center",
 }: {
+  align?: "left" | "center" | "right";
   value: string;
   onChange: (v: string) => void;
   className?: string;
@@ -162,7 +191,11 @@ function MetricInput({
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => e.stopPropagation()}
-      className={cn("block w-full bg-transparent text-center outline-none placeholder:text-[#b5b5b5] disabled:cursor-default", className)}
+      className={cn(
+        "block w-full rounded-[6px] bg-transparent outline-none placeholder:text-[#b5b5b5] disabled:cursor-default",
+        align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center",
+        className,
+      )}
     />
   );
 }

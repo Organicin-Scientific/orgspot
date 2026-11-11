@@ -72,10 +72,13 @@ describe("brand defaults", () => {
     expect(html).not.toContain("<ul");
     expect(html.toLowerCase()).not.toContain("#f2b772");
     expect(html).toContain("family=Nunito+Sans");
-    // Metrics strip: value first in tabular figures, on the tinted panel shared with the editor.
+    // Metrics strip: one ledger card. The first card leads (label, then its figure); the rest
+    // are rows with the label on the left and the figure on the right, in tabular figures.
     expect(html).toContain("font-variant-numeric:tabular-nums");
-    expect(html.toLowerCase()).toContain("#f6f8f7");
-    expect(html.indexOf("$239K+")).toBeLessThan(html.indexOf("Contracted backlog"));
+    expect(html.toLowerCase()).toContain("#e3e8e6");
+    expect(html.indexOf("Contracted backlog")).toBeLessThan(html.indexOf("$239K+"));
+    expect(html.indexOf("Pipeline")).toBeLessThan(html.indexOf("$800K+"));
+    expect(html.indexOf("$239K+")).toBeLessThan(html.indexOf("Pipeline"));
     if (process.env.BRAND_HTML_OUT) (await import("node:fs")).writeFileSync(process.env.BRAND_HTML_OUT, html);
   });
 });

@@ -137,8 +137,8 @@ export function chartGeometry(chart: RevenueChart, size: { width: number; height
   };
 }
 
-/** The metric card's tint. The end dot's ring matches it so the dot reads as cut out of the line. */
-export const CHART_SURFACE = "#f6f8f7";
+/** The metric card's background. The end dot's ring matches it so the dot reads as cut out of the line. */
+export const CHART_SURFACE = "#ffffff";
 
 /**
  * The chart's marks as an SVG string, with no text: the email image draws its labels with the

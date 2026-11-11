@@ -112,7 +112,7 @@ describe("standing strip", () => {
 });
 
 describe("email", () => {
-  it("shows the chart as a signed static image with alt text, in a wider first column", async () => {
+  it("shows the chart as a signed static image with alt text, beside the hero figure", async () => {
     const { renderUpdateEmail } = await import("@/server/email/render");
     const { verifyToken } = await import("@/server/tokens");
     const rendered = await renderUpdateEmail({
@@ -136,6 +136,9 @@ describe("email", () => {
     const token = decodeURIComponent(new URL(src!.replace(/&amp;/g, "&")).searchParams.get("c")!);
     expect(verifyToken("chart", token, 3)).toEqual(["2026", "0,40000,0,60000,0,0,139000,0", "#157A6E"]);
     expect(rendered.html).toContain('alt="Revenue YTD: $239K cash received from customers, January through August 2026."');
-    expect(rendered.html).toContain('width="44%"');
+    // Ledger card: chart cell beside the hero figure, then the other figures as rows.
+    expect(rendered.html).toContain('width="46%"');
+    expect(rendered.html.indexOf("$239K")).toBeLessThan(rendered.html.indexOf("Contracted backlog"));
+    expect(rendered.html.indexOf("Contracted backlog")).toBeLessThan(rendered.html.indexOf("$400K"));
   });
 });
