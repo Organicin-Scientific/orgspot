@@ -61,11 +61,28 @@ export function listTemplatePrompts(doc: DocNode): ListedPrompt[] {
   return out;
 }
 
-/** Remove every `[Write: …]` placeholder from a string the model wrote itself. */
-export function stripPromptMarkers(text: string): string {
+/** Normalised form of a prompt's instruction, for matching the same prompt across texts. */
+export function promptKey(instruction: string): string {
+  return instruction.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/** Every `[Write: …]` instruction in a piece of text, as keys (see `promptKey`). */
+export function promptKeysIn(text: string): Set<string> {
+  const keys = new Set<string>();
+  for (const m of text.matchAll(PROMPT_RE)) keys.add(promptKey(m[1]!));
+  return keys;
+}
+
+/**
+ * Remove the `[Write: …]` placeholders the model typed itself. A placeholder listed in
+ * `keep` came from the author's own material, a gap only they can fill, so it stays where
+ * the model put it and the send check still holds the update until it is filled.
+ */
+export function stripPromptMarkers(text: string, keep: ReadonlySet<string> = new Set()): string {
   return text
-    .replace(PROMPT_RE, "")
+    .replace(PROMPT_RE, (full, instruction: string) => (keep.has(promptKey(instruction)) ? full : ""))
     .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
     .trim();
 }
 
@@ -184,6 +201,35 @@ function dropOrphanLabels(before: unknown[], after: unknown[]): unknown[] {
 }
 
 /**
+ * A fill can carry `**bold**`, as the model writes bold everywhere else. Split such text
+ * nodes into plain and bold runs so the asterisks never reach investors.
+ */
+function boldRuns(nodes: unknown[]): void {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i] as Walkable | undefined;
+    if (!node || typeof node !== "object") continue;
+    if (Array.isArray(node.content)) boldRuns(node.content);
+    if (node.type !== "text" || typeof node.text !== "string" || !/\*\*[^*]+\*\*/.test(node.text)) continue;
+    const base = (node.marks ?? []).filter((m) => m.type !== "bold");
+    const runs: Walkable[] = [];
+    const push = (text: string, bold: boolean) => {
+      if (!text) return;
+      const marks = bold ? [...base, { type: "bold" }] : base;
+      runs.push(marks.length ? { type: "text", text, marks } : { type: "text", text });
+    };
+    let last = 0;
+    for (const m of node.text.matchAll(/\*\*([^*]+)\*\*/g)) {
+      push(node.text.slice(last, m.index), false);
+      push(m[1]!, true);
+      last = m.index! + m[0].length;
+    }
+    push(node.text.slice(last), false);
+    nodes.splice(i, 1, ...runs);
+    i += runs.length - 1;
+  }
+}
+
+/**
  * Replace `[Write: …]` placeholders with drafted text, and remove the ones in `removeIds`
  * (prompts the material doesn't support). Unknown ids keep the placeholder.
  * A removed metric prompt takes its whole card with it.
@@ -207,7 +253,11 @@ export function applyPromptFills(
       const value = raw?.trim();
       if (value) {
         filled += 1;
-        return kind === "metric" && value.length > 40 ? value.slice(0, 40) : value;
+        if (kind === "metric") {
+          const plain = value.replace(/\*\*/g, "");
+          return plain.length > 40 ? plain.slice(0, 40) : plain;
+        }
+        return value;
       }
       if (removeIds.has(current)) {
         removed += 1;
@@ -255,6 +305,7 @@ export function applyPromptFills(
   };
 
   walk(next.content, []);
+  if (filled > 0) boldRuns(next.content as unknown[]);
 
   if (removed > 0) {
     const before = next.content as unknown[];

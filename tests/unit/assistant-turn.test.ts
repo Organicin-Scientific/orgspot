@@ -93,3 +93,82 @@ describe("a drafting turn from a document", () => {
     expect(JSON.stringify(result.content)).toContain("optional one-line");
   });
 });
+
+describe("Revenue YTD and the author's own placeholders", () => {
+  const revenueCard = (d: unknown) => {
+    const blocks = (d as { content: { type: string; attrs?: { items?: { label: string; value: string; chart?: unknown }[] } }[] }).content;
+    return blocks.find((b) => b.type === "metrics")!.attrs!.items!.find((m) => m.label === "Revenue YTD")!;
+  };
+
+  it("builds the chart from monthly cash and derives the headline from it", async () => {
+    modelReply = {
+      reply: "Added the monthly cash.",
+      fills: [],
+      removals: [],
+      edits: [],
+      left_out: [],
+      revenue_months: {
+        year: 2026,
+        months: [14600, 0, 700, 0, 24400, 0, 58300, 64000, 0, 21400].map((cash, i) => ({ month: i + 1, cash })),
+      },
+    };
+    const result = await runAssistantTurn({ doc, history: [], message: "draft", source });
+    const card = revenueCard(result.content);
+    expect(card.chart).toEqual({ year: 2026, months: [14600, 0, 700, 0, 24400, 0, 58300, 64000, 0, 21400] });
+    expect(card.value).toBe("$183K");
+  });
+
+  it("adds only the latest quarter to months already on the card", async () => {
+    modelReply = {
+      reply: "Added the monthly cash.",
+      fills: [], removals: [], edits: [], left_out: [],
+      revenue_months: { year: 2026, months: [{ month: 1, cash: 14600 }, { month: 2, cash: 0 }, { month: 3, cash: 700 }] },
+    };
+    const first = await runAssistantTurn({ doc, history: [], message: "q1", source: null });
+    modelReply = {
+      reply: "Added Q2.",
+      fills: [], removals: [], edits: [], left_out: [],
+      revenue_months: { year: 2026, months: [{ month: 4, cash: 0 }, { month: 5, cash: 24400 }, { month: 6, cash: 0 }] },
+    };
+    const second = await runAssistantTurn({ doc: first.content!, history: [], message: "q2", source: null });
+    expect(revenueCard(second.content).chart).toEqual({ year: 2026, months: [14600, 0, 700, 0, 24400, 0] });
+  });
+
+  it("refuses a quarter that leaves a gap, and says which month is missing", async () => {
+    modelReply = {
+      reply: "Added Q3.",
+      fills: [], removals: [], edits: [], left_out: [],
+      revenue_months: { year: 2026, months: [{ month: 7, cash: 58300 }] },
+    };
+    const result = await runAssistantTurn({ doc, history: [], message: "q3", source: null });
+    expect(result.content).toBeNull();
+    expect(result.reply).toContain("needs January 2026");
+  });
+
+  it("won't put a typed value on the Revenue YTD card", async () => {
+    modelReply = { reply: "Filled revenue.", fills: [{ id: id("Revenue YTD from Mercury"), text: "$183K" }], removals: [], edits: [], left_out: [] };
+    const result = await runAssistantTurn({ doc, history: [], message: "revenue is $183K", source: null });
+    expect(revenueCard(result.content ?? doc).value).toContain("[Write:");
+  });
+
+  it("keeps a placeholder copied from the author's material and drops one it invented", async () => {
+    modelReply = {
+      reply: "Drafted Lowlights.",
+      fills: [
+        { id: id("what slipped"), text: "Testing slowed turnaround by [Write: weeks]. We expect to clear it by [Write: month]." },
+        { id: id("a risk investors"), text: "A partner changed leadership. [Write: invented by the model]" },
+      ],
+      removals: [], edits: [], left_out: [],
+    };
+    const result = await runAssistantTurn({
+      doc,
+      history: [],
+      message: "draft",
+      source: { kind: "text", filename: "draft.md", text: "slowed turnaround by [Write: weeks] ... clear by [Write: month]" },
+    });
+    const text = JSON.stringify(result.content);
+    expect(text).toContain("[Write: weeks]");
+    expect(text).toContain("[Write: month]");
+    expect(text).not.toContain("invented by the model");
+  });
+});

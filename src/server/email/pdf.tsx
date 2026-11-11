@@ -150,6 +150,62 @@ function PdfRevenueChart({ chart, ctx }: { chart: RevenueChart; ctx: Ctx }) {
   );
 }
 
+function isBoldLabel(node: Extract<BlockNode, { type: "paragraph" }>): boolean {
+  const texts = (node.content ?? []).filter((n) => n.type === "text" && n.text.trim());
+  return texts.length > 0 && texts.every((n) => n.type === "text" && n.marks?.some((m) => m.type === "bold")) &&
+    texts.reduce((len, n) => len + (n.type === "text" ? n.text.length : 0), 0) <= 80;
+}
+
+/** A heading or a short bold sub-label ("Products"): it should never end a page alone. */
+function isLead(node: BlockNode): boolean {
+  return node.type === "heading" || (node.type === "paragraph" && isBoldLabel(node));
+}
+
+/**
+ * Top-level blocks, with each run of headings and sub-labels tied to what follows it so a
+ * heading never sits alone at the foot of a page. A list is split after its first item:
+ * the heading travels with that item and the rest of the list can still break normally.
+ */
+function Body({ blocks, ctx }: { blocks: BlockNode[]; ctx: Ctx }): React.ReactElement {
+  const out: React.ReactElement[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    if (!isLead(blocks[i]!)) {
+      out.push(<Block key={i} node={blocks[i]!} ctx={ctx} />);
+      continue;
+    }
+    const leads: BlockNode[] = [];
+    let j = i;
+    while (j < blocks.length && isLead(blocks[j]!)) leads.push(blocks[j++]!);
+    const next = blocks[j];
+    const leadEls = leads.map((b, k) => <Block key={k} node={b} ctx={ctx} />);
+    if (next && (next.type === "bulletList" || next.type === "orderedList") && next.content.length > 1) {
+      const start = next.type === "orderedList" ? (next.attrs?.start ?? 1) : 1;
+      const first = { ...next, content: next.content.slice(0, 1) } as BlockNode;
+      const rest = (next.type === "orderedList"
+        ? { ...next, attrs: { ...next.attrs, start: start + 1 }, content: next.content.slice(1) }
+        : { ...next, content: next.content.slice(1) }) as BlockNode;
+      out.push(
+        <View key={i} wrap={false}>
+          {leadEls}
+          <View style={{ marginBottom: -8 }}>
+            <Block node={first} ctx={ctx} />
+          </View>
+        </View>,
+      );
+      out.push(<Block key={`${i}-rest`} node={rest} ctx={ctx} />);
+    } else {
+      out.push(
+        <View key={i} wrap={false}>
+          {leadEls}
+          {next ? <Block node={next} ctx={ctx} /> : null}
+        </View>,
+      );
+    }
+    i = next ? j : j - 1;
+  }
+  return <>{out}</>;
+}
+
 function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolean }): React.ReactElement | null {
   switch (node.type) {
     case "paragraph":
@@ -370,9 +426,7 @@ export async function renderUpdatePdf(input: PdfInput): Promise<Buffer> {
             <Image src={banner} style={{ width: 480 }} />
           </View>
         ) : null}
-        {input.content.content.map((node, i) => (
-          <Block key={i} node={node} ctx={ctx} />
-        ))}
+        <Body blocks={input.content.content} ctx={ctx} />
         <Text
           style={s.footer}
           fixed

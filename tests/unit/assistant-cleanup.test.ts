@@ -120,7 +120,8 @@ describe("assistant edits can't add leftovers", () => {
     expect(metrics.type).toBe("metrics");
     if (metrics.type !== "metrics") return;
     expect(metrics.attrs.items.map((m) => m.label)).toEqual(["Revenue YTD", "Contracted backlog", "Pipeline"]);
-    expect(metrics.attrs.items.map((m) => m.value)).toEqual(["$122.3K", "[Write: uncollected contract value]", "$234K"]);
+    // Revenue YTD takes monthly figures only (revenue_months), so a typed value is ignored.
+    expect(metrics.attrs.items.map((m) => m.value)).toEqual(["[Write: Revenue YTD from Mercury]", "[Write: uncollected contract value]", "$234K"]);
   });
 
   it("refuses a new metrics strip and won't turn another block into one", () => {

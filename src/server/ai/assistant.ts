@@ -10,12 +10,14 @@ import {
 } from "@/lib/content/assistant-progress";
 import {
   applyAssistantChanges,
+  applyRevenueMonths,
   ASSISTANT_BLOCK_TYPES,
   ASSISTANT_EDIT_OPS,
   docOutline,
   type AssistantEdit,
 } from "@/lib/content/assistant-edits";
-import { applyPromptFills, listTemplatePrompts, type ListedPrompt } from "@/lib/content/prompt-fills";
+import { applyPromptFills, listTemplatePrompts, promptKeysIn, stripPromptMarkers, type ListedPrompt } from "@/lib/content/prompt-fills";
+import { MONTH_NAMES, REVENUE_YTD_LABEL } from "@/lib/content/revenue-chart";
 import { parseDoc, type DocNode } from "@/lib/content/schema";
 import type { AssistantMessage } from "@/lib/types";
 import { env } from "../env";
@@ -33,9 +35,11 @@ How you change the update:
 - Use "fills" to answer template prompts by id. Follow each prompt's instruction.
 - Use "removals" for the ids of prompts the material doesn't support. That includes optional prompts, spare bullets and metric cards with no matching figure. A removed prompt takes its empty bullet or label with it. Leave a prompt in place only when the author has to supply something you can't, and name it in the reply.
 - Use "edits" for anything else. "replace" rewrites the block at an outline index. "insert_after" adds a new block after an index (-1 puts it at the top). "delete" removes a block. Indices always refer to the outline in the latest message, so several edits in one reply never shift each other.
-- Never write "[Write: …]" or any other placeholder yourself. Write finished text, or leave the thing out.
+- Never invent a "[Write: …]" placeholder. Write finished text, or leave the thing out.
+- The author's material can hold its own "[Write: …]" placeholders: facts only the author can supply, such as a date or a count. Copy each one exactly, brackets included, into the sentence where that fact belongs. Never drop it, and never smooth the sentence around it so the gap disappears.
 - Keep the template's sections and order. Don't delete headings, the opening quote, the "What do we do?" line or the metrics unless the author asks.
 - The metrics strip holds the standing figures. Fill or remove its prompts, or replace its values, but never rename a card or add one.
+- The Revenue YTD card is a chart built from cash received in each month. Never type its value; give "revenue_months" instead. Each entry is one month (1 = January) and the customer cash received in that month, in whole dollars. When the material gives running totals, give each month's difference from the month before. Include a month with no cash as 0. When the card already has months (shown in the outline), give only the months after its last one, normally the latest quarter, unless the material corrects an earlier month. Give months only through the last complete or as-of month the material covers. Leave "revenue_months" empty when the material has no monthly figures.
 - For a replaced or inserted block give "type" plus "text" (paragraph, heading, pull_quote), "items" (bullet_list, numbered_list, metrics as "Label | value"), and "level" 2 or 3 for headings. Use **double asterisks** for bold. Keep bold labels the template uses, such as **TL;DR**.
 - To revise text that is already written, replace its block with the full new version.
 - Change the update only when the author asks for a change or gives material to draft from. For questions or conversation, answer in "reply" and return empty "fills", "removals" and "edits".
@@ -58,6 +62,20 @@ const RESPONSE_SCHEMA = {
     reply: { type: SchemaType.STRING },
     removals: { type: SchemaType.ARRAY, items: { type: SchemaType.INTEGER } },
     left_out: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+    revenue_months: {
+      type: SchemaType.OBJECT,
+      properties: {
+        year: { type: SchemaType.INTEGER },
+        months: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: { month: { type: SchemaType.INTEGER }, cash: { type: SchemaType.NUMBER } },
+            required: ["month", "cash"],
+          },
+        },
+      },
+    },
     fills: {
       type: SchemaType.ARRAY,
       items: {
@@ -89,6 +107,14 @@ const responseShape = z.object({
   reply: z.string().max(4_000),
   removals: z.array(z.number().int().min(0).max(500)).max(200).default([]),
   left_out: z.array(z.string().max(500)).max(40).default([]),
+  revenue_months: z
+    .object({
+      year: z.number().int(),
+      months: z.array(z.object({ month: z.number().int(), cash: z.number() })).max(12),
+    })
+    .nullable()
+    .optional()
+    .catch(undefined),
   fills: z.array(z.object({ id: z.number().int().min(0).max(500), text: z.string().max(8_000) })).max(200),
   edits: z
     .array(
@@ -214,6 +240,7 @@ export async function runAssistantTurn(opts: {
   const turnText = [
     "The update as it stands:",
     docOutline(opts.doc),
+    revenueChartLine(opts.doc),
     "",
     "Unfilled template prompts:",
     promptList,
@@ -259,10 +286,12 @@ export async function runAssistantTurn(opts: {
   const parsed = responseShape.safeParse(json);
   if (!parsed.success) throw badRequest("Gemini returned an unexpected response. Try again.");
 
+  // Placeholders the author wrote in their own material survive the model's output.
+  const keep = promptKeysIn([opts.message, opts.source?.kind === "text" ? opts.source.text : ""].join("\n"));
   const knownIds = new Set(prompts.map((p) => p.id));
   const fills = new Map<number, string>();
   for (const f of parsed.data.fills) {
-    const text = f.text.trim();
+    const text = stripPromptMarkers(f.text, keep);
     if (knownIds.has(f.id) && text) fills.set(f.id, text);
   }
   const removals = new Set(parsed.data.removals.filter((id) => knownIds.has(id) && !fills.has(id)));
@@ -273,6 +302,7 @@ export async function runAssistantTurn(opts: {
   }
   const edits: AssistantEdit[] = parsed.data.edits;
   const leftOut = parsed.data.left_out.map((l) => l.trim()).filter(Boolean);
+  const months = parsed.data.revenue_months?.months?.length ? parsed.data.revenue_months : null;
 
   const reply = parsed.data.reply.trim() || "Done.";
   const unchanged = (): AssistantTurnResult => ({
@@ -284,12 +314,21 @@ export async function runAssistantTurn(opts: {
     edited: 0,
     remainingPrompts: prompts.length,
   });
-  if (fills.size === 0 && removals.size === 0 && edits.length === 0) return unchanged();
+  if (fills.size === 0 && removals.size === 0 && edits.length === 0 && !months) return unchanged();
 
   step("Checking the changes fit the template");
-  const applied = applyAssistantChanges(opts.doc, fills, edits, removals);
-  let doc = applied.doc;
+  const applied = applyAssistantChanges(opts.doc, fills, edits, removals, keep);
+  let doc = keepRevenueCard(opts.doc, applied.doc);
   let removed = applied.removed;
+  let edited = applied.edited;
+  let chartNote: string | null = null;
+  if (months) {
+    const charted = applyRevenueMonths(doc, months);
+    if (charted.changed) {
+      doc = charted.doc;
+      edited += 1;
+    } else chartNote = charted.problem;
+  }
   // Edits can re-introduce an optional prompt only by keeping an old block; sweep once more.
   if (opts.source) {
     const stray = new Set(listTemplatePrompts(doc).filter((p) => p.optional).map((p) => p.id));
@@ -304,15 +343,52 @@ export async function runAssistantTurn(opts: {
     log.warn("assistant.invalid_doc", { error: validated.error });
     throw badRequest("Gemini's edit didn't fit the update's format. Try rephrasing the request.");
   }
-  if (applied.filled === 0 && removed === 0 && applied.edited === 0) return unchanged();
+  if (applied.filled === 0 && removed === 0 && edited === 0) return chartNote ? { ...unchanged(), reply: `${unchanged().reply}\n\n${chartNote}` } : unchanged();
   const remaining = listTemplatePrompts(validated.doc);
   return {
-    reply: composeReply(reply, leftOut, remaining),
+    reply: composeReply(chartNote ? `${reply} ${chartNote}` : reply, leftOut, remaining),
     content: validated.doc,
     filled: applied.filled,
     removed,
-    edited: applied.edited,
+    edited,
     remainingPrompts: remaining.length,
+  };
+}
+
+/** The Revenue YTD card's monthly figures, so the model knows which months are already in. */
+function revenueChartLine(doc: DocNode): string {
+  for (const block of doc.content) {
+    if (block.type !== "metrics") continue;
+    const card = block.attrs.items.find((m) => m.label === REVENUE_YTD_LABEL);
+    if (!card) continue;
+    if (!card.chart?.months.length) return "Revenue YTD card monthly figures: none entered yet.";
+    const list = card.chart.months.map((v, i) => `${MONTH_NAMES[i]} $${Math.round(v)}`).join(", ");
+    return `Revenue YTD card monthly figures (${card.chart.year}): ${list}.`;
+  }
+  return "";
+}
+
+/**
+ * A metric fill can't put a typed value on the Revenue YTD card: its headline must come
+ * from monthly figures, or the card shows a number with no chart. Put the card back as it
+ * was; `revenue_months` is the only way the assistant changes it.
+ */
+function keepRevenueCard(before: DocNode, after: DocNode): DocNode {
+  const card = (d: DocNode) => {
+    for (const b of d.content) if (b.type === "metrics") {
+      const c = b.attrs.items.find((m) => m.label === REVENUE_YTD_LABEL);
+      if (c) return c;
+    }
+    return null;
+  };
+  const old = card(before);
+  const now = card(after);
+  if (!old || !now || now.chart || now.value === old.value) return after;
+  return {
+    ...after,
+    content: after.content.map((b) =>
+      b.type === "metrics" ? { ...b, attrs: { ...b.attrs, items: b.attrs.items.map((m) => (m === now ? { ...m, value: old.value } : m)) } } : b,
+    ),
   };
 }
 
