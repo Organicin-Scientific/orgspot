@@ -1,4 +1,4 @@
-import { applyPromptFills } from "./prompt-fills";
+import { applyPromptFills, stripPromptMarkers } from "./prompt-fills";
 import type { BlockNode, DocNode, InlineNode, ListItemNode } from "./schema";
 
 /**
@@ -34,6 +34,7 @@ export interface AssistantEdit {
 export interface AssistantChangeResult {
   doc: DocNode;
   filled: number;
+  removed: number;
   edited: number;
   skipped: number;
 }
@@ -150,14 +151,16 @@ function paragraphOf(text: string): BlockNode {
 
 function cleanItems(items: string[] | undefined): string[] {
   return (items ?? [])
-    .map((s) => (typeof s === "string" ? s.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim() : ""))
+    .map((s) => (typeof s === "string" ? stripPromptMarkers(s.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "")) : ""))
     .filter(Boolean)
     .slice(0, MAX_ITEMS);
 }
 
 /** Build a schema-valid block from one edit, or null when the edit is unusable. */
 export function blockFromEdit(edit: AssistantEdit): BlockNode | null {
-  const text = typeof edit.text === "string" ? edit.text.trim() : "";
+  // The model writes finished text. A "[Write: …]" it types itself is a placeholder nobody
+  // asked for, so it is dropped here rather than shown to investors.
+  const text = typeof edit.text === "string" ? stripPromptMarkers(edit.text) : "";
   switch (edit.type) {
     case "paragraph":
       return text ? paragraphOf(text) : null;
@@ -197,6 +200,24 @@ export function blockFromEdit(edit: AssistantEdit): BlockNode | null {
 
 const EDITABLE_TYPES = new Set<BlockNode["type"]>(["paragraph", "heading", "bulletList", "orderedList", "pullQuote", "metrics"]);
 
+type MetricItem = { label: string; sublabel: string; value: string };
+
+/**
+ * The metrics strip holds the standing figures investors compare quarter to quarter, so the
+ * assistant can change values but never the cards' labels or count. A replacement is matched
+ * to the existing cards by position; a value it leaves blank keeps what was there.
+ */
+function lockedMetrics(existing: MetricItem[], proposed: MetricItem[]): BlockNode | null {
+  let changed = false;
+  const items = existing.map((card, i) => {
+    const value = proposed[i]?.value?.trim();
+    if (!value || value === card.value) return card;
+    changed = true;
+    return { ...card, value: value.slice(0, 40) };
+  });
+  return changed ? { type: "metrics", attrs: { items } } : null;
+}
+
 // ---------------------------------------------------------------------------
 // Applying a reply
 
@@ -209,8 +230,9 @@ export function applyAssistantChanges(
   doc: DocNode,
   fills: ReadonlyMap<number, string>,
   edits: readonly AssistantEdit[],
+  removals: ReadonlySet<number> = new Set(),
 ): AssistantChangeResult {
-  const filledResult = applyPromptFills(doc, fills);
+  const filledResult = applyPromptFills(doc, fills, removals);
   const blocks = filledResult.doc.content;
   const n = blocks.length;
 
@@ -224,6 +246,8 @@ export function applyAssistantChanges(
     const index = Number.isInteger(edit.index) ? edit.index : NaN;
     if (edit.op === "insert_after") {
       if (!(index >= -1 && index < n)) { skipped++; continue; }
+      // New metric strips are the author's call; the assistant only fills the existing one.
+      if (edit.type === "metrics") { skipped++; continue; }
       const block = blockFromEdit(edit);
       if (!block) { skipped++; continue; }
       inserts.set(index, [...(inserts.get(index) ?? []), block]);
@@ -238,8 +262,17 @@ export function applyAssistantChanges(
       continue;
     }
     if (edit.op === "replace") {
-      if (!EDITABLE_TYPES.has(blocks[index]!.type)) { skipped++; continue; }
-      const block = blockFromEdit(edit);
+      const target = blocks[index]!;
+      if (!EDITABLE_TYPES.has(target.type)) { skipped++; continue; }
+      let block = target.type === "metrics" ? null : blockFromEdit(edit);
+      if (target.type === "metrics") {
+        // Only a metrics edit can touch the strip, and only its values. The value is the last
+        // "|" part of each line, so "Pipeline | $234K" and a bare "$234K" both work.
+        const values = edit.type === "metrics" ? (edit.items ?? []).map((line) => stripPromptMarkers(String(line).split("|").pop() ?? "")) : [];
+        block = lockedMetrics(target.attrs.items, values.map((value) => ({ label: "", sublabel: "", value })));
+      } else if (block?.type === "metrics") {
+        block = null;
+      }
       if (!block) { skipped++; continue; }
       replaced.set(index, block);
       deleted.delete(index);
@@ -258,6 +291,7 @@ export function applyAssistantChanges(
   return {
     doc: { type: "doc", content: content.length ? content : [{ type: "paragraph" }] },
     filled: filledResult.filled,
+    removed: filledResult.removed,
     edited,
     skipped,
   };

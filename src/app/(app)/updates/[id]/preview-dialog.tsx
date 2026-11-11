@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, Download, Loader2, Monitor, Smartphone } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, ChevronDown, Download, Loader2, Monitor, Smartphone } from "lucide-react";
+import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api, errorMessage } from "@/lib/api-client";
+import { api, errorMessage, postForFile, saveBlob } from "@/lib/api-client";
 import type { DocNode } from "@/lib/content/schema";
 import { formatBytes } from "@/lib/format";
 import type { SenderSnapshot } from "@/lib/types";
@@ -23,6 +25,7 @@ interface PreviewResult {
 }
 
 type View = "desktop" | "mobile" | "pdf" | "text";
+type PdfFile = { blob: Blob; url: string; filename: string };
 
 export function PreviewDialog({
   open,
@@ -51,16 +54,56 @@ function PreviewBody({ updateId, meta, getContent }: { updateId: string; meta: M
   const [view, setView] = useState<View>("desktop");
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pdfNonce] = useState(() => Date.now());
+  // Snapshot the editor once per opening, so the email, PDF and downloads all show the same version.
+  const [content] = useState(getContent);
+  const [pdf, setPdf] = useState<PdfFile | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const pdfRequest = useRef<Promise<PdfFile> | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    api<PreviewResult>(`/api/updates/${updateId}/preview`, { body: { ...meta, content: getContent() }, signal: ctrl.signal })
+    api<PreviewResult>(`/api/updates/${updateId}/preview`, { body: { ...meta, content }, signal: ctrl.signal })
       .then(setResult)
       .catch((err) => !ctrl.signal.aborted && setError(errorMessage(err)));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateId]);
+
+  /** Render the PDF from the same snapshot once; the tab and the Download menu share it. */
+  const loadPdf = useCallback(() => {
+    pdfRequest.current ??= postForFile(`/api/updates/${updateId}/pdf`, { ...meta, content }).then(({ blob, filename }) => {
+      const file = { blob, url: URL.createObjectURL(blob), filename: filename ?? `${fileBase(meta.title)}.pdf` };
+      setPdf(file);
+      return file;
+    });
+    pdfRequest.current.catch((err) => {
+      pdfRequest.current = null;
+      setPdfError(errorMessage(err));
+    });
+    return pdfRequest.current;
+  }, [updateId, meta, content]);
+
+  useEffect(() => {
+    if (view === "pdf") void loadPdf().catch(() => {});
+  }, [view, loadPdf]);
+  useEffect(() => () => void (pdf && URL.revokeObjectURL(pdf.url)), [pdf]);
+
+  async function downloadPdf() {
+    setDownloading(true);
+    try {
+      const file = await loadPdf();
+      saveBlob(file.blob, file.filename);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  function downloadText(body: string, type: string, ext: string) {
+    saveBlob(new Blob([body], { type: `${type};charset=utf-8` }), `${fileBase(meta.title)}.${ext}`);
+  }
 
   return (
     <>
@@ -72,6 +115,7 @@ function PreviewBody({ updateId, meta, getContent }: { updateId: string; meta: M
                 {result ? `From ${result.sender.fromName || "—"} <${result.sender.fromEmail || "not configured"}>` : "Rendering the exact email investors will receive…"}
               </DialogDescription>
             </div>
+            <div className="flex items-center gap-2">
             <Tabs value={view} onValueChange={(v) => setView(v as View)}>
               <TabsList>
                 <TabsTrigger value="desktop">
@@ -84,6 +128,23 @@ function PreviewBody({ updateId, meta, getContent }: { updateId: string; meta: M
                 <TabsTrigger value="text">Plain text</TabsTrigger>
               </TabsList>
             </Tabs>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={downloading}>
+                  {downloading ? <Loader2 className="animate-spin" /> : <Download />} Download <ChevronDown className="opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void downloadPdf()}>PDF</DropdownMenuItem>
+                <DropdownMenuItem disabled={!result} onSelect={() => result && downloadText(result.html, "text/html", "html")}>
+                  Email (HTML)
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!result} onSelect={() => result && downloadText(result.text, "text/plain", "txt")}>
+                  Plain text
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            </div>
           </div>
         </DialogHeader>
 
@@ -97,15 +158,22 @@ function PreviewBody({ updateId, meta, getContent }: { updateId: string; meta: M
           )}
           {!error && view === "pdf" && (
             <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b bg-background px-4 py-2 text-xs text-muted-foreground">
-                <span>PDF of the last saved version{meta.pdfDelivery === "none" ? " · not included with this update" : ""}</span>
-                <Button asChild variant="ghost" size="xs">
-                  <a href={`/api/updates/${updateId}/pdf?download=1`}>
-                    <Download /> Download
-                  </a>
-                </Button>
-              </div>
-              <iframe title="PDF preview" src={`/api/updates/${updateId}/pdf?v=${pdfNonce}`} className="min-h-0 flex-1 bg-white" />
+              {meta.pdfDelivery === "none" && (
+                <div className="border-b bg-background px-4 py-2 text-xs text-muted-foreground">This PDF isn&apos;t included with this update.</div>
+              )}
+              {pdfError ? (
+                <div className="p-6">
+                  <Alert variant="destructive">
+                    <AlertDescription>{pdfError}</AlertDescription>
+                  </Alert>
+                </div>
+              ) : pdf ? (
+                <iframe title="PDF preview" src={pdf.url} className="min-h-0 flex-1 bg-white" />
+              ) : (
+                <div className="flex flex-1 items-center justify-center">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
           )}
           {!error && view !== "pdf" && !result && (
@@ -142,4 +210,14 @@ function PreviewBody({ updateId, meta, getContent }: { updateId: string; meta: M
         </div>
     </>
   );
+}
+
+/** File name stem from the update title, matching the server's PDF naming. */
+function fileBase(title: string): string {
+  const base = title
+    .replace(/[^\w\- ]+/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 80);
+  return base || "investor-update";
 }
