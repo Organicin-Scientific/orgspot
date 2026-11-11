@@ -1,4 +1,5 @@
 import { applyPromptFills, stripPromptMarkers } from "./prompt-fills";
+import { chartTotal, formatShortUsd, REVENUE_YTD_LABEL } from "./revenue-chart";
 import type { BlockNode, DocNode, InlineNode, ListItemNode } from "./schema";
 
 /**
@@ -149,18 +150,19 @@ function paragraphOf(text: string): BlockNode {
   return content.length ? { type: "paragraph", content } : { type: "paragraph" };
 }
 
-function cleanItems(items: string[] | undefined): string[] {
+function cleanItems(items: string[] | undefined, keep: ReadonlySet<string>): string[] {
   return (items ?? [])
-    .map((s) => (typeof s === "string" ? stripPromptMarkers(s.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "")) : ""))
+    .map((s) => (typeof s === "string" ? stripPromptMarkers(s.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, ""), keep) : ""))
     .filter(Boolean)
     .slice(0, MAX_ITEMS);
 }
 
 /** Build a schema-valid block from one edit, or null when the edit is unusable. */
-export function blockFromEdit(edit: AssistantEdit): BlockNode | null {
+export function blockFromEdit(edit: AssistantEdit, keep: ReadonlySet<string> = new Set()): BlockNode | null {
   // The model writes finished text. A "[Write: …]" it types itself is a placeholder nobody
-  // asked for, so it is dropped here rather than shown to investors.
-  const text = typeof edit.text === "string" ? stripPromptMarkers(edit.text) : "";
+  // asked for, so it is dropped here rather than shown to investors. One copied from the
+  // author's own material (`keep`) marks a fact only they can supply, so it stays.
+  const text = typeof edit.text === "string" ? stripPromptMarkers(edit.text, keep) : "";
   switch (edit.type) {
     case "paragraph":
       return text ? paragraphOf(text) : null;
@@ -175,13 +177,13 @@ export function blockFromEdit(edit: AssistantEdit): BlockNode | null {
     }
     case "bullet_list":
     case "numbered_list": {
-      const items = cleanItems(edit.items);
+      const items = cleanItems(edit.items, keep);
       if (!items.length) return null;
       const content: ListItemNode[] = items.map((item) => ({ type: "listItem", content: [paragraphOf(item)] }));
       return edit.type === "bullet_list" ? { type: "bulletList", content } : { type: "orderedList", attrs: { start: 1 }, content };
     }
     case "metrics": {
-      const items = cleanItems(edit.items)
+      const items = cleanItems(edit.items, new Set())
         .slice(0, 4)
         .map((line) => {
           const parts = line.split("|").map((p) => p.trim());
@@ -210,8 +212,9 @@ type MetricItem = { label: string; sublabel: string; value: string; chart?: { ye
 function lockedMetrics(existing: MetricItem[], proposed: MetricItem[]): BlockNode | null {
   let changed = false;
   const items = existing.map((card, i) => {
-    // A charted card's headline comes from its monthly figures, which only the author enters.
-    if (card.chart?.months?.length) return card;
+    // Revenue YTD's headline is derived from its monthly figures (see applyRevenueMonths),
+    // so a typed value would show a number with no chart behind it.
+    if (card.label === REVENUE_YTD_LABEL || card.chart?.months?.length) return card;
     const value = proposed[i]?.value?.trim();
     if (!value || value === card.value) return card;
     changed = true;
@@ -233,6 +236,7 @@ export function applyAssistantChanges(
   fills: ReadonlyMap<number, string>,
   edits: readonly AssistantEdit[],
   removals: ReadonlySet<number> = new Set(),
+  keep: ReadonlySet<string> = new Set(),
 ): AssistantChangeResult {
   const filledResult = applyPromptFills(doc, fills, removals);
   const blocks = filledResult.doc.content;
@@ -250,7 +254,7 @@ export function applyAssistantChanges(
       if (!(index >= -1 && index < n)) { skipped++; continue; }
       // New metric strips are the author's call; the assistant only fills the existing one.
       if (edit.type === "metrics") { skipped++; continue; }
-      const block = blockFromEdit(edit);
+      const block = blockFromEdit(edit, keep);
       if (!block) { skipped++; continue; }
       inserts.set(index, [...(inserts.get(index) ?? []), block]);
       edited++;
@@ -266,7 +270,7 @@ export function applyAssistantChanges(
     if (edit.op === "replace") {
       const target = blocks[index]!;
       if (!EDITABLE_TYPES.has(target.type)) { skipped++; continue; }
-      let block = target.type === "metrics" ? null : blockFromEdit(edit);
+      let block = target.type === "metrics" ? null : blockFromEdit(edit, keep);
       if (target.type === "metrics") {
         // Only a metrics edit can touch the strip, and only its values. The value is the last
         // "|" part of each line, so "Pipeline | $234K" and a bare "$234K" both work.
@@ -298,3 +302,64 @@ export function applyAssistantChanges(
     skipped,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Revenue YTD monthly figures
+
+export interface RevenueMonthsInput {
+  year: number;
+  /** Customer cash received in each listed month; month 1 is January. */
+  months: { month: number; cash: number }[];
+}
+
+export interface RevenueMonthsResult {
+  doc: DocNode;
+  changed: boolean;
+  /** Why nothing changed, for the chat; null when the chart was updated. */
+  problem: string | null;
+}
+
+/**
+ * Put monthly cash figures from the assistant onto the Revenue YTD card. Months already on
+ * the card keep their values unless the author's material restates them, so a new quarter
+ * can be added on its own. The months must run from January with no gap; anything else is
+ * refused rather than guessed at, and the card's headline is rederived from the months.
+ */
+export function applyRevenueMonths(doc: DocNode, input: RevenueMonthsInput): RevenueMonthsResult {
+  const unchanged = (problem: string): RevenueMonthsResult => ({ doc, changed: false, problem });
+  const index = doc.content.findIndex((b) => b.type === "metrics" && b.attrs.items.some((m) => m.label === REVENUE_YTD_LABEL));
+  if (index < 0) return unchanged("The update has no Revenue YTD card.");
+  const block = doc.content[index]!;
+  if (block.type !== "metrics") return unchanged("The update has no Revenue YTD card.");
+  if (!Number.isInteger(input.year) || input.year < 2000 || input.year > 2100) return unchanged("The monthly figures had no valid year.");
+
+  const given = new Map<number, number>();
+  for (const { month, cash } of input.months) {
+    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isFinite(cash) || cash < 0 || cash > 1e11) {
+      return unchanged("The monthly figures included a month or amount that isn't valid.");
+    }
+    given.set(month, Math.round(cash));
+  }
+  if (!given.size) return unchanged("No monthly figures were given.");
+
+  const card = block.attrs.items.find((m) => m.label === REVENUE_YTD_LABEL)!;
+  const existing = card.chart && card.chart.year === input.year ? card.chart.months : [];
+  const through = Math.max(existing.length, ...given.keys());
+  const months: number[] = [];
+  for (let m = 1; m <= through; m++) {
+    const value = given.has(m) ? given.get(m)! : existing[m - 1];
+    if (value === undefined) {
+      return unchanged(`The Revenue YTD card needs ${MONTHS[m - 1]} ${input.year} before later months can be added.`);
+    }
+    months.push(value);
+  }
+
+  const chart = { year: input.year, months };
+  const same = card.chart?.year === chart.year && card.chart.months.length === months.length && card.chart.months.every((v, i) => v === months[i]);
+  if (same) return unchanged("The Revenue YTD card already has these figures.");
+  const items = block.attrs.items.map((m) => (m === card ? { ...m, chart, value: formatShortUsd(chartTotal(chart)) } : m));
+  const content = doc.content.map((b, i) => (i === index ? { type: "metrics" as const, attrs: { ...block.attrs, items } } : b));
+  return { doc: { ...doc, content }, changed: true, problem: null };
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

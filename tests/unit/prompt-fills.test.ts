@@ -48,3 +48,21 @@ describe("prompt fills", () => {
     expect(remainingPrompts).toBe(before - 1);
   });
 });
+
+describe("bold and kept placeholders in fills", () => {
+  it("turns **bold** in a fill into a bold run", async () => {
+    const { applyPromptFills } = await import("../../src/lib/content/prompt-fills");
+    const d = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "[Write: program]", marks: [{ type: "italic" }] }] }] } as never;
+    const out = applyPromptFills(d, new Map([[0, "**CinThesis (Enteron)** shipped."]]));
+    expect((out.doc.content[0] as { content: unknown[] }).content).toEqual([
+      { type: "text", text: "CinThesis (Enteron)", marks: [{ type: "bold" }] },
+      { type: "text", text: " shipped." },
+    ]);
+  });
+
+  it("strips invented placeholders but keeps the author's", async () => {
+    const { stripPromptMarkers, promptKeysIn } = await import("../../src/lib/content/prompt-fills");
+    const keep = promptKeysIn("turnaround by [Write: weeks]");
+    expect(stripPromptMarkers("Slowed by [Write: weeks]. Done [Write: other] .", keep)).toBe("Slowed by [Write: weeks]. Done.");
+  });
+});
