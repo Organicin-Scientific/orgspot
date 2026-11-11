@@ -13,7 +13,7 @@ import { getGroup } from "../db/groups";
 import { fullSendReadiness, getSettings } from "../db/settings";
 import { suppressedSet } from "../db/suppression";
 import { getUpdate, updatesCol } from "../db/updates";
-import { emailProvider } from "../email";
+import { domainCheckProvider, emailProvider } from "../email";
 import { renderUpdatePdf } from "../email/pdf";
 import { GMAIL_CLIP_BYTES, renderUpdateEmail } from "../email/render";
 import { db } from "../firebase-admin";
@@ -82,12 +82,18 @@ export async function resolveAudience(sel: AudienceSelection): Promise<ResolvedA
   return { selected: byId.size, eligible, excluded, groupNames };
 }
 
+const SEND_ONLY_KEY_HINT =
+  "Your Resend API key is send-only and cannot read domain status. In the Resend dashboard, create a full-access API key and set it as RESEND_API_KEY, or set RESEND_DOMAIN_API_KEY (full access) while keeping a send-only RESEND_API_KEY.";
+
 export async function senderDomainCheck(fromEmail: string): Promise<string | null> {
   const provider = emailProvider();
   if (!provider.live) return null;
   const domain = fromEmail.split("@")[1] ?? "";
-  const status = await provider.domainStatus(domain);
-  if (status.error) return `Could not verify the sending domain: ${status.error}`;
+  const status = await domainCheckProvider().domainStatus(domain);
+  if (status.error) {
+    if (/restricted to only send/i.test(status.error)) return SEND_ONLY_KEY_HINT;
+    return `Could not verify the sending domain: ${status.error}`;
+  }
   if (!status.found) return `The sending domain ${domain} has not been added to Resend.`;
   if (!status.verified) return `The sending domain ${domain} is not verified yet (status: ${status.status}).`;
   return null;

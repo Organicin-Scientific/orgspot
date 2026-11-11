@@ -27,6 +27,8 @@ const schema = z
 
     EMAIL_SENDING_ENABLED: bool,
     RESEND_API_KEY: z.string().optional(),
+    /** Full-access Resend key for Domains API checks when RESEND_API_KEY is send-only. */
+    RESEND_DOMAIN_API_KEY: z.string().optional(),
     RESEND_WEBHOOK_SECRET: z.string().optional(),
     RESEND_MAX_REQUESTS_PER_SECOND: z.coerce.number().min(0.5).max(50).default(2),
     SENDER_EMAIL: z.string().optional(),

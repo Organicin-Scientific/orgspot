@@ -39,7 +39,8 @@ Variables are defined in `.env.example` and validated in `src/server/env.ts`. Be
 | `AUTH_REQUIRE_MFA` | Enforce TOTP MFA on session creation | Must be `true` in production |
 | `SESSION_MAX_AGE_HOURS` | Session cookie lifetime | Bounded in schema |
 | `EMAIL_SENDING_ENABLED` | Opt-in to live Resend | Only true in production when ready |
-| `RESEND_API_KEY` | Resend API key | Required when live sending is enabled |
+| `RESEND_API_KEY` | Resend API key | Required when live sending is enabled; may be send-only |
+| `RESEND_DOMAIN_API_KEY` | Full-access Resend key (optional) | Use when `RESEND_API_KEY` is send-only; Settings and pre-send checks call Resend’s Domains API |
 | `RESEND_WEBHOOK_SECRET` | Svix signing secret for webhooks | Required when `EMAIL_SENDING_ENABLED=true`; 503 on webhook route if missing |
 | `RESEND_MAX_REQUESTS_PER_SECOND` | Send pacing | Default 2 |
 | `SENDER_EMAIL` | Default sender domain check in settings | See `src/server/db/settings.ts` |
@@ -139,6 +140,7 @@ Set `CRON_SECRET` in Vercel (production) to a long random value and match it in 
 5. Subscribe to events that map to the normaliser in `src/server/campaigns/events.ts` / `src/lib/delivery.ts`, including: `sent`, `delivered`, `delivery_delayed`, `bounced`, `complained`, `opened`, `clicked`, `failed` (and `suppressed` where emitted). Raw payloads use Resend’s `email.<event>` naming; ignored types return `{ ok: true, ignored: true }`.
 6. Put the Svix signing secret into **`RESEND_WEBHOOK_SECRET`** (used by `Webhook` from the `svix` package in `src/app/api/webhooks/resend/route.ts`).
 7. **Open/click tracking** toggles are per domain in Resend (surfaced in the API via domain status in `src/server/email/resend-provider.ts`).
+8. **API key permission:** Sending uses `RESEND_API_KEY`. Domain verification (Settings → Email delivery, and checks before test/live send) calls Resend’s Domains API. A **send-only** key returns *“This API key is restricted to only send emails”* — either use a **full-access** key for `RESEND_API_KEY`, or add a separate full-access `RESEND_DOMAIN_API_KEY` and keep send-only on `RESEND_API_KEY`.
 
 ## Node.js and `firebase-admin`
 
