@@ -58,7 +58,7 @@ export function assertSameOrigin(req: NextRequest) {
   }
 }
 
-function assertCsrf(req: NextRequest) {
+export function assertCsrf(req: NextRequest) {
   assertSameOrigin(req);
   const cookie = req.cookies.get(CSRF_COOKIE)?.value;
   const header = req.headers.get(CSRF_HEADER);

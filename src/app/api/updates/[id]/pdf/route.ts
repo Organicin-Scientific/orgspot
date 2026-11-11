@@ -3,6 +3,7 @@ import { getUpdate } from "@/server/db/updates";
 import { renderUpdatePdf } from "@/server/email/pdf";
 import { pdfFilename } from "@/server/email/render";
 import { notFound } from "@/server/http/errors";
+import { contentDisposition } from "@/server/http/content-disposition";
 import { withAdmin } from "@/server/http/handler";
 
 export const maxDuration = 60;
@@ -18,11 +19,11 @@ export const GET = withAdmin<{ id: string }>(async ({ req, params }) => {
     settings: await getSettings(),
     dateLabel: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
   });
-  const disposition = req.nextUrl.searchParams.get("download") ? "attachment" : "inline";
+  const kind = req.nextUrl.searchParams.get("download") ? "attachment" : "inline";
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${pdfFilename(update.title)}"`,
+      "Content-Disposition": contentDisposition(kind, pdfFilename(update.title)),
     },
   });
 });

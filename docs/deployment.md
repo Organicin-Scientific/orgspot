@@ -94,9 +94,13 @@ npm run admin -- add you@company.com
 
 Use `list` and `remove` per the script header in `scripts/admin.ts`.
 
+## Vercel Preview environment variables
+
+Preview deploys need the same Firebase and signing secrets as Production (enable **Preview** on each secret in the Vercel dashboard), plus Preview-specific overrides documented in [environments.md](./environments.md). Set `APP_ENV=preview`, `EMAIL_SENDING_ENABLED=false`, and `AI_DRAFT_ENABLED=false` on Preview. `APP_URL` may be omitted; the app derives it from `VERCEL_URL` on Preview.
+
 ## Vercel Cron
 
-`vercel.json` schedules a **once-daily** cron (Hobby plan limit), at **11:00 UTC** (~6:00 US Eastern):
+`vercel.json` schedules a **once-daily** cron (Hobby plan limit), at **11:00 UTC** (~6:00 US Eastern). See [operations.md](./operations.md) for how this relates to GitHub’s 10-minute worker.
 
 - **Path:** `GET /api/internal/worker`
 - **Authorisation:** `Authorization: Bearer <CRON_SECRET>` (compare `src/app/api/internal/worker/route.ts`)

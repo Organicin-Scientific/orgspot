@@ -5,6 +5,7 @@ import type { AssetMeta } from "@/lib/types";
 import { env } from "./env";
 import { bucket, db } from "./firebase-admin";
 import { badRequest, serviceUnavailable } from "./http/errors";
+import { log } from "./logger";
 import { chunk, data, isoRequired, num, str } from "./db/convert";
 
 export const assetsCol = () => db().collection("assets");
@@ -18,7 +19,7 @@ const STORAGE_DISABLED_MESSAGE =
 function storageProbeFailureMessage(err: unknown): string {
   if (isStorageDisabledError(err)) return STORAGE_DISABLED_MESSAGE;
   const detail = err instanceof Error ? err.message : String(err);
-  console.error("Storage probe failed:", detail);
+  log.error("storage.probe_failed", { detail: detail.slice(0, 200) });
   const bucketName = env().FIREBASE_STORAGE_BUCKET;
   return `Could not reach Firebase Storage bucket "${bucketName}". Check that the service account has access to it. (${detail.slice(0, 200)})`;
 }
