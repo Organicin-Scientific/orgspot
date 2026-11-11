@@ -78,6 +78,19 @@ firebase deploy --only firestore:rules,firestore:indexes,storage --project <proj
 
 Set **`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`** to your deployed hostname (for example `investor.organicinscientific.com`), not only the default `*.firebaseapp.com` domain, when following this pattern.
 
+Firebase registers redirect URIs for `https://<project-id>.firebaseapp.com/__/auth/handler` automatically. When `authDomain` is your own hostname, you must add matching entries in **Google Cloud Console** or Google sign-in fails with **`Error 400: redirect_uri_mismatch`**.
+
+In GCP project **`orgspot-afbf7`** (same project as Firebase):
+
+1. **APIs & Services → Credentials** → open the **Web client** used by Firebase (often named *Web client (auto created by Google Service)*).
+2. Under **Authorised JavaScript origins**, add `https://investor.organicinscientific.com` (keep existing `https://orgspot-afbf7.firebaseapp.com` and `http://localhost` for local dev).
+3. Under **Authorised redirect URIs**, add **`https://investor.organicinscientific.com/__/auth/handler`** (exact path; keep the `firebaseapp.com` handler URI too).
+4. Save. Changes can take a few minutes to propagate; retry sign-in in a private window.
+
+Also in **Firebase Console → Authentication → Settings → Authorised domains**, ensure `investor.organicinscientific.com` is listed (missing domains cause `auth/unauthorized-domain`, not `redirect_uri_mismatch`).
+
+Sign in only at `https://investor.organicinscientific.com` (not `www.` — that host redirects). Preview URLs on `*.vercel.app` still use the custom `authDomain` from env; add each preview hostname to Firebase authorised domains if you need Google sign-in on previews.
+
 ## First admin (Firestore allowlist)
 
 Administrators are explicit documents in the `admins` collection (keyed by normalised email). The CLI loads `.env.local` when present:
