@@ -1,3 +1,4 @@
+import { clampLabel, type AssistantStreamEvent } from "@/lib/content/assistant-progress";
 import { parseDoc } from "@/lib/content/schema";
 import { audit } from "@/server/audit";
 import { changeSummary, runAssistantTurn } from "@/server/ai/assistant";
@@ -5,7 +6,8 @@ import { aiDraftConfigured } from "@/server/ai/config";
 import { sourceFromUpload, truncateNotes } from "@/server/ai/source-text";
 import { appendAssistantTurn, clearAssistantMessages, listAssistantMessages } from "@/server/db/assistant";
 import { getUpdate } from "@/server/db/updates";
-import { badRequest, conflict, notFound, serviceUnavailable } from "@/server/http/errors";
+import { ApiError, badRequest, conflict, notFound, serviceUnavailable } from "@/server/http/errors";
+import { log } from "@/server/logger";
 import { ok, withAdmin } from "@/server/http/handler";
 
 const MAX_BODY = 4_600_000;
@@ -22,8 +24,11 @@ export const GET = withAdmin<P>(async ({ params }) => {
 
 /**
  * One chat turn. Form fields: `message` (text), `content` (the editor's current document as
- * JSON) and an optional `file` (PDF, Word or text). Returns the saved user and assistant
- * messages, plus the revised document when the assistant changed it.
+ * JSON) and an optional `file` (PDF, Word or text).
+ *
+ * Input errors return JSON as usual. Once the input is valid the response is a stream of
+ * newline-delimited events: `step` labels as the turn progresses, then one `done` carrying the
+ * saved user and assistant messages and the revised document, or one `error`.
  */
 export const POST = withAdmin<P>(
   async ({ req, params, session }) => {
@@ -51,34 +56,71 @@ export const POST = withAdmin<P>(
     const messageField = form.get("message");
     const message = truncateNotes(typeof messageField === "string" ? messageField : "");
     const file = form.get("file");
-    const source = file instanceof File && file.size > 0 ? await sourceFromUpload(file) : null;
-    if (!message && !source) throw badRequest("Type a message or attach a document.");
+    const upload = file instanceof File && file.size > 0 ? file : null;
+    if (!message && !upload) throw badRequest("Type a message or attach a document.");
 
-    const history = await listAssistantMessages(params.id);
-    const result = await runAssistantTurn({ doc: doc.doc, history, message, source });
-    const summary = changeSummary(result);
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: AssistantStreamEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        const step = (label: string) => send({ type: "step", label: clampLabel(label) });
+        try {
+          if (upload) step(`Reading ${upload.name}`);
+          const source = upload ? await sourceFromUpload(upload) : null;
+          if (source?.kind === "text") {
+            const words = source.text.split(/\s+/).filter(Boolean).length;
+            step(`Read ${source.filename} · ${words.toLocaleString("en-US")} words`);
+          } else if (source?.kind === "pdf") {
+            step(`Attached ${source.filename} for Gemini to read`);
+          }
 
-    const messages = await appendAssistantTurn(
-      params.id,
-      session.email,
-      { text: message, fileName: source?.filename ?? null },
-      { text: result.reply, changeSummary: summary },
-    );
+          const history = await listAssistantMessages(params.id);
+          const result = await runAssistantTurn({ doc: doc.doc, history, message, source, onStep: step });
+          const summary = changeSummary(result);
 
-    await audit({
-      actorEmail: session.email,
-      action: "update.assistant",
-      resourceType: "update",
-      resourceId: params.id,
-      summary: `Assistant turn${source ? " with a document" : ""}: ${summary ?? "no document changes"} (${result.remainingPrompts} prompts left)`,
+          step(result.content ? "Saving the changes" : "Saving the conversation");
+          const messages = await appendAssistantTurn(
+            params.id,
+            session.email,
+            { text: message, fileName: source?.filename ?? null },
+            { text: result.reply, changeSummary: summary },
+          );
+
+          await audit({
+            actorEmail: session.email,
+            action: "update.assistant",
+            resourceType: "update",
+            resourceId: params.id,
+            summary: `Assistant turn${source ? " with a document" : ""}: ${summary ?? "no document changes"} (${result.remainingPrompts} prompts left)`,
+          });
+
+          send({
+            type: "done",
+            result: {
+              messages,
+              content: result.content,
+              filled: result.filled,
+              edited: result.edited,
+              remainingPrompts: result.remainingPrompts,
+            },
+          });
+        } catch (err) {
+          if (err instanceof ApiError) send({ type: "error", status: err.status, message: err.message });
+          else {
+            log.error("assistant.turn_failed", { err });
+            send({ type: "error", status: 500, message: "Something went wrong. Please try again." });
+          }
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    return ok({
-      messages,
-      content: result.content,
-      filled: result.filled,
-      edited: result.edited,
-      remainingPrompts: result.remainingPrompts,
+    return new Response(body, {
+      headers: {
+        "content-type": "application/x-ndjson; charset=utf-8",
+        "x-accel-buffering": "no",
+      },
     });
   },
   { rateLimit: "aiDraft" },
