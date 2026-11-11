@@ -22,7 +22,8 @@ export function emailProvider(): EmailProvider {
 /** Read-only provider for domain verification checks (works in any environment with an API key). */
 export function domainCheckProvider(): EmailProvider {
   const e = env();
-  return e.RESEND_API_KEY ? new ResendProvider(e.RESEND_API_KEY) : new SandboxProvider();
+  const key = e.RESEND_DOMAIN_API_KEY ?? e.RESEND_API_KEY;
+  return key ? new ResendProvider(key) : new SandboxProvider();
 }
 
 /** Test hook. */
