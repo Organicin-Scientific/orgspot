@@ -1,7 +1,9 @@
 import * as React from "react";
 import { Body, Container, Head, Html, Img, Link, Preview } from "@react-email/components";
 import { QUOTE_GREY } from "@/lib/brand";
+import { CHART_SIZE, chartAltText, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
 import type { BlockNode, DocNode, InlineNode, Mark, MetricItem } from "@/lib/content/schema";
+import { metricDisplayValue } from "@/lib/content/template";
 
 export interface EmailBranding {
   companyName: string;
@@ -19,6 +21,8 @@ export interface EmailModel {
   branding: EmailBranding;
   bannerUrl: string | null;
   resolveImage: (assetId: string) => string;
+  /** Static PNG of the Revenue YTD chart. Mail clients run no script, so the chart is an image. */
+  chartUrl: (chart: RevenueChart) => string;
   pdf: { mode: "attach" | "link" | "none"; url: string | null; filename: string };
   attachments: { name: string; url: string }[];
   footer: { postalAddress: string; note: string; unsubscribeUrl: string; replyTo: string };
@@ -106,11 +110,20 @@ function Table({ children, style, align }: { children: React.ReactNode; style?: 
   );
 }
 
+/** Column widths: the Revenue YTD card is wider so its chart has room; the rest share what's left. */
+function metricWidths(items: MetricItem[]): string[] {
+  const chartIndex = items.findIndex((it) => it.label === REVENUE_YTD_LABEL);
+  if (chartIndex === -1 || items.length === 1) return items.map(() => `${Math.floor(100 / items.length)}%`);
+  const rest = Math.floor(56 / (items.length - 1));
+  return items.map((_, i) => (i === chartIndex ? "44%" : `${rest}%`));
+}
+
 function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
   // Value first, then what it is, then how it's measured. A tinted panel with hairline
   // dividers keeps the figures reading as one set, and tabular figures keep digits aligned
-  // when investors compare one quarter's strip with the last.
-  const width = `${Math.floor(100 / items.length)}%`;
+  // when investors compare one quarter's strip with the last. Revenue YTD adds its chart
+  // under the basis line, so the three headline values stay on one row.
+  const widths = metricWidths(items);
   const anySublabel = items.some((it) => it.sublabel);
   return (
     <table
@@ -132,7 +145,7 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
           {items.map((it, i) => (
             <td
               key={i}
-              width={width}
+              width={widths[i]}
               valign="top"
               align="center"
               style={{
@@ -152,7 +165,7 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
                   color: ctx.m.branding.primaryColor,
                 })}
               >
-                {it.value}
+                {metricDisplayValue(it)}
               </p>
               <p
                 style={textStyle(ctx.m, {
@@ -168,6 +181,15 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
                 <p style={textStyle(ctx.m, { margin: "1px 0 0", fontSize: "11px", lineHeight: "15px", color: MUTED })}>
                   {it.sublabel || "\u00a0"}
                 </p>
+              ) : null}
+              {hasChartData(it.chart) ? (
+                <Img
+                  src={ctx.m.chartUrl(it.chart)}
+                  alt={chartAltText(it.chart)}
+                  width={CHART_SIZE.width}
+                  height={CHART_SIZE.height}
+                  style={{ display: "block", width: "100%", maxWidth: `${CHART_SIZE.width}px`, height: "auto", border: 0, margin: "12px auto 0" }}
+                />
               ) : null}
             </td>
           ))}

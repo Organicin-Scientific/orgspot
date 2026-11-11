@@ -10,7 +10,8 @@ import { DEFAULT_LOGO_PATH, LEAF_BULLET_PNG_PATH } from "@/lib/brand";
 import { fontStack } from "../db/settings";
 import { env } from "../env";
 import { assetUrl, type StoredAsset } from "../storage";
-import { assetPreviewToken } from "../tokens";
+import { assetPreviewToken, chartToken } from "../tokens";
+import { encodeChartMonths, type RevenueChart } from "@/lib/content/revenue-chart";
 
 /** Per-recipient values are substituted into the frozen snapshot at send time. */
 export const PLACEHOLDERS = {
@@ -67,6 +68,8 @@ export function buildModel(input: RenderInput): EmailModel {
     },
     bannerUrl: input.bannerAssetId ? imageUrl(input.bannerAssetId) : null,
     resolveImage: imageUrl,
+    chartUrl: (chart: RevenueChart) =>
+      `${env().APP_URL}/api/charts/revenue?c=${encodeURIComponent(chartToken(chart.year, encodeChartMonths(chart), settings.branding.primaryColor))}`,
     pdf: {
       mode: input.pdfDelivery,
       url: input.pdfDelivery === "link" ? PLACEHOLDERS.pdf : null,

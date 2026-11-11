@@ -200,7 +200,7 @@ export function blockFromEdit(edit: AssistantEdit): BlockNode | null {
 
 const EDITABLE_TYPES = new Set<BlockNode["type"]>(["paragraph", "heading", "bulletList", "orderedList", "pullQuote", "metrics"]);
 
-type MetricItem = { label: string; sublabel: string; value: string };
+type MetricItem = { label: string; sublabel: string; value: string; chart?: { year: number; months: number[] } };
 
 /**
  * The metrics strip holds the standing figures investors compare quarter to quarter, so the
@@ -210,6 +210,8 @@ type MetricItem = { label: string; sublabel: string; value: string };
 function lockedMetrics(existing: MetricItem[], proposed: MetricItem[]): BlockNode | null {
   let changed = false;
   const items = existing.map((card, i) => {
+    // A charted card's headline comes from its monthly figures, which only the author enters.
+    if (card.chart?.months?.length) return card;
     const value = proposed[i]?.value?.trim();
     if (!value || value === card.value) return card;
     changed = true;

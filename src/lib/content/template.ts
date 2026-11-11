@@ -1,4 +1,5 @@
-import type { BlockNode, DocNode } from "./schema";
+import { chartTotal, formatShortUsd, hasChartData, REVENUE_YTD_LABEL } from "./revenue-chart";
+import type { BlockNode, DocNode, MetricItem } from "./schema";
 
 /**
  * Starter document for a quarterly investor update, built on the structure and voice of
@@ -57,7 +58,73 @@ export function isStandingMetrics(items: readonly { label: string; sublabel: str
   );
 }
 
-const METRIC_PROMPTS = ["cash received YTD", "uncollected contract value", "open proposals"];
+/** Writing prompts for each card's value, in STANDING_METRICS order. */
+export const METRIC_PROMPTS = ["Revenue YTD from Mercury", "uncollected contract value", "open proposals"];
+
+/** A fresh standing strip whose values are all prompts, so it blocks investor sends until filled. */
+export function standingPromptItems(): MetricItem[] {
+  return STANDING_METRICS.map((m, i) => ({ ...m, value: `${PROMPT_OPEN}${METRIC_PROMPTS[i]}]` }));
+}
+
+/**
+ * Card labels from the strip used before November 2026. A draft still carrying any of them
+ * gets the standing strip with fresh prompts; the old values measured different things, so
+ * none carry over.
+ */
+const LEGACY_LABELS = new Set(["Revenue this quarter", "Contracts signed", "Pipeline / next two quarters"]);
+
+function isLegacyStrip(items: readonly { label: string; sublabel: string }[]): boolean {
+  return items.some(
+    (it) => LEGACY_LABELS.has(it.label.trim()) || (it.label.trim() === "Pipeline" && /next two quarters/i.test(it.sublabel)),
+  );
+}
+
+/** Replace any legacy metrics strip with the standing strip and its prompts. Returns the same doc when nothing changes. */
+export function migrateLegacyMetrics(doc: DocNode): DocNode {
+  let changed = false;
+  const walk = (nodes: BlockNode[]): BlockNode[] =>
+    nodes.map((node) => {
+      if (node.type === "metrics" && isLegacyStrip(node.attrs.items)) {
+        changed = true;
+        return { type: "metrics", attrs: { items: standingPromptItems() } };
+      }
+      if ((node.type === "blockquote" || node.type === "callout") && node.content) {
+        const content = walk(node.content);
+        return content === node.content ? node : { ...node, content };
+      }
+      return node;
+    });
+  const content = walk(doc.content);
+  return changed ? { ...doc, content } : doc;
+}
+
+/**
+ * The headline a card shows. Revenue YTD with chart data always shows the chart's total, so
+ * the number above the chart and its last point cannot disagree.
+ */
+export function metricDisplayValue(item: MetricItem): string {
+  return hasChartData(item.chart) ? formatShortUsd(chartTotal(item.chart)) : item.value;
+}
+
+/**
+ * Revenue YTD cards whose value was filled without the monthly figures behind the chart.
+ * Investor sends wait for those figures, so the email never shows a total with no chart.
+ */
+export function revenueChartGaps(doc: DocNode): number {
+  let gaps = 0;
+  const walk = (nodes: BlockNode[] | undefined) => {
+    for (const node of nodes ?? []) {
+      if (node.type === "metrics") {
+        for (const it of node.attrs.items) {
+          if (it.label === REVENUE_YTD_LABEL && !hasChartData(it.chart) && !countPromptMarkers(it.value)) gaps++;
+        }
+      }
+      if (node.type === "blockquote" || node.type === "callout") walk(node.content);
+    }
+  };
+  walk(doc.content);
+  return gaps;
+}
 
 export function starterDocument(): DocNode {
   return {
@@ -76,7 +143,7 @@ export function starterDocument(): DocNode {
       {
         type: "metrics",
         attrs: {
-          items: STANDING_METRICS.map((m, i) => ({ ...m, value: `${PROMPT_OPEN}${METRIC_PROMPTS[i]}]` })),
+          items: standingPromptItems(),
         },
       },
 

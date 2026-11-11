@@ -1,7 +1,9 @@
 import "server-only";
 import path from "node:path";
 import * as React from "react";
-import { Document, Font, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Circle, Defs, Document, Font, Image, Line, LinearGradient, Link, Page, Path, Stop, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { CHART_STYLE, CHART_SURFACE, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { metricDisplayValue } from "@/lib/content/template";
 import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
 import type { AppSettings } from "@/lib/types";
@@ -115,6 +117,39 @@ function Inline({ nodes, ctx }: { nodes?: InlineNode[]; ctx: Ctx }) {
   );
 }
 
+/** The Revenue YTD chart as vector marks, from the same geometry as the email image. */
+function PdfRevenueChart({ chart, ctx }: { chart: RevenueChart; ctx: Ctx }) {
+  const g = chartGeometry(chart);
+  const st = CHART_STYLE;
+  const k = 0.62; // points per CSS pixel, sized to the wider PDF card
+  const label = { position: "absolute" as const, fontSize: 5.5, color: st.label };
+  return (
+    <View style={{ width: g.width * k, height: g.height * k, marginTop: 8, position: "relative" }}>
+      <Svg width={g.width * k} height={g.height * k} viewBox={`0 0 ${g.width} ${g.height}`}>
+        <Defs>
+          <LinearGradient id="rv" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={ctx.color} stopOpacity={st.fillOpacity} />
+            <Stop offset="1" stopColor={ctx.color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
+        <Path d={g.areaPath} fill="url(#rv)" />
+        <Path d={g.linePath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
+        <Circle cx={g.end.x} cy={g.end.y} r={st.dot} fill={ctx.color} stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
+      </Svg>
+      <Text style={{ ...label, left: 2 * k, top: g.yLabel.y * k }}>{g.yLabel.text}</Text>
+      {g.ticks.map((t) => (
+        <Text
+          key={t.anchor}
+          style={{ ...label, top: (g.baseY + 2) * k, ...(t.anchor === "start" ? { left: t.x * k } : { right: (g.width - t.x) * k }) }}
+        >
+          {t.label}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolean }): React.ReactElement | null {
   switch (node.type) {
     case "paragraph":
@@ -192,13 +227,14 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
       );
     case "metrics": {
       const anySublabel = node.attrs.items.some((m) => m.sublabel);
+      const hasChart = node.attrs.items.some((m) => m.label === REVENUE_YTD_LABEL && hasChartData(m.chart));
       return (
         <View
           style={{
             flexDirection: "row",
             marginTop: 4,
             marginBottom: 16,
-            backgroundColor: "#f6f8f7",
+            backgroundColor: CHART_SURFACE,
             borderWidth: 0.75,
             borderColor: "#e3e8e6",
             borderRadius: 6,
@@ -209,7 +245,7 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
             <View
               key={i}
               style={{
-                flex: 1,
+                flex: hasChart && m.label === REVENUE_YTD_LABEL ? 1.6 : 1,
                 alignItems: "center",
                 paddingHorizontal: 4,
                 paddingVertical: 10,
@@ -217,11 +253,12 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
                 borderLeftColor: "#e3e8e6",
               }}
             >
-              <Text style={{ fontSize: 17, fontFamily: ctx.f.bold, color: ctx.color }}>{m.value}</Text>
+              <Text style={{ fontSize: 17, fontFamily: ctx.f.bold, color: ctx.color }}>{metricDisplayValue(m)}</Text>
               <Text style={{ fontSize: 8.5, fontFamily: ctx.f.bold, color: ctx.text, marginTop: 3, textAlign: "center" }}>
                 {m.label}
               </Text>
               {anySublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center", marginTop: 1 }}>{m.sublabel || " "}</Text> : null}
+              {hasChartData(m.chart) ? <PdfRevenueChart chart={m.chart} ctx={ctx} /> : null}
             </View>
           ))}
         </View>

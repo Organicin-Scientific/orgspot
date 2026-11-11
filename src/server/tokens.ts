@@ -8,7 +8,7 @@ import { env } from "./env";
  * email content, which keeps provider idempotency keys valid.
  */
 
-type Purpose = "unsub" | "file" | "asset";
+type Purpose = "unsub" | "file" | "asset" | "chart";
 
 function sign(data: string): string {
   return createHmac("sha256", env().TOKEN_SIGNING_SECRET).update(data).digest("base64url").slice(0, 32);
@@ -61,4 +61,12 @@ export function assetPreviewToken(assetId: string) {
 /** `fileKey` is "update" for the campaign PDF, or an attachment asset id. */
 export function fileToken(campaignId: string, recipientId: string, fileKey: string, expiresAtMs: number) {
   return createToken("file", [campaignId, recipientId, fileKey], expiresAtMs);
+}
+
+/**
+ * Signs the figures behind a Revenue YTD chart image so the public chart route only draws
+ * what this app put in an email. Deterministic, so a retried send renders identical HTML.
+ */
+export function chartToken(year: number, months: string, color: string) {
+  return createToken("chart", [String(year), months, color]);
 }
