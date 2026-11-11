@@ -32,8 +32,9 @@ export interface EmailModel {
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
 /** Matches the metric cards in the editor, so the draft and the sent email look alike. */
-const METRIC_BG = "#f6f8f7";
 const METRIC_BORDER = "#e3e8e6";
+const METRIC_RULE = "#eef1f0";
+const METRIC_LABEL = "#5b6561";
 
 interface Ctx {
   m: EmailModel;
@@ -110,21 +111,16 @@ function Table({ children, style, align }: { children: React.ReactNode; style?: 
   );
 }
 
-/** Column widths: the Revenue YTD card is wider so its chart has room; the rest share what's left. */
-function metricWidths(items: MetricItem[]): string[] {
-  const chartIndex = items.findIndex((it) => it.label === REVENUE_YTD_LABEL);
-  if (chartIndex === -1 || items.length === 1) return items.map(() => `${Math.floor(100 / items.length)}%`);
-  const rest = Math.floor(56 / (items.length - 1));
-  return items.map((_, i) => (i === chartIndex ? "44%" : `${rest}%`));
-}
-
 function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
-  // Value first, then what it is, then how it's measured. A tinted panel with hairline
-  // dividers keeps the figures reading as one set, and tabular figures keep digits aligned
-  // when investors compare one quarter's strip with the last. Revenue YTD adds its chart
-  // under the basis line, so the three headline values stay on one row.
-  const widths = metricWidths(items);
-  const anySublabel = items.some((it) => it.sublabel);
+  // One ledger card. The hero figure (Revenue YTD, or the first card) leads with its chart
+  // beside it; the other figures follow as label-and-value rows. Rows keep working at any
+  // width, so the strip reads the same in Gmail, a phone's mail app and the PDF. Tabular
+  // figures keep digits aligned when investors compare one quarter with the last.
+  const heroIndex = Math.max(0, items.findIndex((it) => it.label === REVENUE_YTD_LABEL));
+  const hero = items[heroIndex];
+  if (!hero) return null;
+  const chart = hasChartData(hero.chart) ? hero.chart : null;
+  const rows = items.filter((_, i) => i !== heroIndex);
   return (
     <table
       role="presentation"
@@ -135,65 +131,78 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
       style={{
         borderCollapse: "separate",
         margin: "6px 0 24px",
-        backgroundColor: METRIC_BG,
+        backgroundColor: "#ffffff",
         border: `1px solid ${METRIC_BORDER}`,
-        borderRadius: "10px",
+        borderRadius: "12px",
       }}
     >
       <tbody>
         <tr>
-          {items.map((it, i) => (
-            <td
-              key={i}
-              width={widths[i]}
-              valign="top"
-              align="center"
-              style={{
-                padding: "16px 8px 14px",
-                textAlign: "center",
-                borderLeft: i === 0 ? "none" : `1px solid ${METRIC_BORDER}`,
-              }}
-            >
+          <td colSpan={2} style={{ padding: "18px 20px 16px" }}>
+            <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} style={{ borderCollapse: "collapse" }}>
+              <tbody>
+                <tr>
+                  <td valign="bottom" style={{ textAlign: "left" }}>
+                    <p style={textStyle(ctx.m, { margin: "0", fontSize: "12px", lineHeight: "16px", fontWeight: 600, color: METRIC_LABEL })}>
+                      {hero.label}
+                    </p>
+                    <p
+                      style={textStyle(ctx.m, {
+                        margin: "2px 0 0",
+                        fontSize: "30px",
+                        lineHeight: "34px",
+                        fontWeight: 700,
+                        letterSpacing: "-0.5px",
+                        fontVariantNumeric: "tabular-nums",
+                        color: ctx.m.branding.primaryColor,
+                      })}
+                    >
+                      {metricDisplayValue(hero)}
+                    </p>
+                    {hero.sublabel ? (
+                      <p style={textStyle(ctx.m, { margin: "2px 0 0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{hero.sublabel}</p>
+                    ) : null}
+                  </td>
+                  {chart ? (
+                    <td valign="bottom" width="46%" style={{ textAlign: "right", paddingLeft: "12px" }}>
+                      <Img
+                        src={ctx.m.chartUrl(chart)}
+                        alt={chartAltText(chart)}
+                        width={CHART_SIZE.width}
+                        height={CHART_SIZE.height}
+                        style={{ display: "inline-block", width: "100%", maxWidth: `${CHART_SIZE.width}px`, height: "auto", border: 0 }}
+                      />
+                    </td>
+                  ) : null}
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        {rows.map((it, i) => (
+          <tr key={i}>
+            <td valign="middle" style={{ padding: "12px 0 12px 20px", borderTop: `1px solid ${METRIC_RULE}`, textAlign: "left" }}>
+              <p style={textStyle(ctx.m, { margin: "0", fontSize: "13px", lineHeight: "18px", fontWeight: 600 })}>{it.label}</p>
+              {it.sublabel ? (
+                <p style={textStyle(ctx.m, { margin: "1px 0 0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{it.sublabel}</p>
+              ) : null}
+            </td>
+            <td valign="middle" align="right" style={{ padding: "12px 20px 12px 12px", borderTop: `1px solid ${METRIC_RULE}`, textAlign: "right", whiteSpace: "nowrap" }}>
               <p
                 style={textStyle(ctx.m, {
                   margin: "0",
-                  fontSize: "24px",
-                  lineHeight: "30px",
+                  fontSize: "20px",
+                  lineHeight: "26px",
                   fontWeight: 700,
-                  letterSpacing: "-0.3px",
+                  letterSpacing: "-0.2px",
                   fontVariantNumeric: "tabular-nums",
-                  color: ctx.m.branding.primaryColor,
                 })}
               >
                 {metricDisplayValue(it)}
               </p>
-              <p
-                style={textStyle(ctx.m, {
-                  margin: "6px 0 0",
-                  fontSize: "13px",
-                  lineHeight: "18px",
-                  fontWeight: 600,
-                })}
-              >
-                {it.label}
-              </p>
-              {anySublabel ? (
-                <p style={textStyle(ctx.m, { margin: "1px 0 0", fontSize: "11px", lineHeight: "15px", color: MUTED })}>
-                  {it.sublabel || "\u00a0"}
-                </p>
-              ) : null}
-              {hasChartData(it.chart) ? (
-                <Img
-                  src={ctx.m.chartUrl(it.chart)}
-                  alt={chartAltText(it.chart)}
-                  width={CHART_SIZE.width}
-                  height={CHART_SIZE.height}
-                  style={{ display: "block", width: "100%", maxWidth: `${CHART_SIZE.width}px`, height: "auto", border: 0, margin: "12px auto 0" }}
-                />
-              ) : null}
             </td>
-          ))}
-        </tr>
+          </tr>
+        ))}
       </tbody>
     </table>
   );

@@ -121,10 +121,10 @@ function Inline({ nodes, ctx }: { nodes?: InlineNode[]; ctx: Ctx }) {
 function PdfRevenueChart({ chart, ctx }: { chart: RevenueChart; ctx: Ctx }) {
   const g = chartGeometry(chart);
   const st = CHART_STYLE;
-  const k = 0.62; // points per CSS pixel, sized to the wider PDF card
+  const k = 0.78; // points per CSS pixel, sized to the ledger card's header
   const label = { position: "absolute" as const, fontSize: 5.5, color: st.label };
   return (
-    <View style={{ width: g.width * k, height: g.height * k, marginTop: 8, position: "relative" }}>
+    <View style={{ width: g.width * k, height: g.height * k, position: "relative" }}>
       <Svg width={g.width * k} height={g.height * k} viewBox={`0 0 ${g.width} ${g.height}`}>
         <Defs>
           <LinearGradient id="rv" x1="0" y1="0" x2="0" y2="1">
@@ -282,41 +282,37 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
         </View>
       );
     case "metrics": {
-      const anySublabel = node.attrs.items.some((m) => m.sublabel);
-      const hasChart = node.attrs.items.some((m) => m.label === REVENUE_YTD_LABEL && hasChartData(m.chart));
+      // One ledger card, as in the editor and the email: the hero figure (Revenue YTD, or the
+      // first card) with its chart, then the other figures as label-and-value rows.
+      const items = node.attrs.items;
+      const heroIndex = Math.max(0, items.findIndex((m) => m.label === REVENUE_YTD_LABEL));
+      const hero = items[heroIndex];
+      if (!hero) return null;
+      const rule = { borderTopWidth: 0.75, borderTopColor: "#eef1f0" };
       return (
         <View
-          style={{
-            flexDirection: "row",
-            marginTop: 4,
-            marginBottom: 16,
-            backgroundColor: CHART_SURFACE,
-            borderWidth: 0.75,
-            borderColor: "#e3e8e6",
-            borderRadius: 6,
-          }}
+          style={{ marginTop: 4, marginBottom: 16, backgroundColor: CHART_SURFACE, borderWidth: 0.75, borderColor: "#e3e8e6", borderRadius: 8 }}
           wrap={false}
         >
-          {node.attrs.items.map((m, i) => (
-            <View
-              key={i}
-              style={{
-                flex: hasChart && m.label === REVENUE_YTD_LABEL ? 1.6 : 1,
-                alignItems: "center",
-                paddingHorizontal: 4,
-                paddingVertical: 10,
-                borderLeftWidth: i === 0 ? 0 : 0.75,
-                borderLeftColor: "#e3e8e6",
-              }}
-            >
-              <Text style={{ fontSize: 17, fontFamily: ctx.f.bold, color: ctx.color }}>{metricDisplayValue(m)}</Text>
-              <Text style={{ fontSize: 8.5, fontFamily: ctx.f.bold, color: ctx.text, marginTop: 3, textAlign: "center" }}>
-                {m.label}
-              </Text>
-              {anySublabel ? <Text style={{ fontSize: 7, color: MUTED, textAlign: "center", marginTop: 1 }}>{m.sublabel || " "}</Text> : null}
-              {hasChartData(m.chart) ? <PdfRevenueChart chart={m.chart} ctx={ctx} /> : null}
+          <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 11 }}>
+            <View>
+              <Text style={{ fontSize: 8, fontFamily: ctx.f.bold, color: "#5b6561" }}>{hero.label}</Text>
+              <Text style={{ fontSize: 21, lineHeight: 1.25, fontFamily: ctx.f.bold, color: ctx.color, marginTop: 1 }}>{metricDisplayValue(hero)}</Text>
+              {hero.sublabel ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 1 }}>{hero.sublabel}</Text> : null}
             </View>
-          ))}
+            {hasChartData(hero.chart) ? <PdfRevenueChart chart={hero.chart} ctx={ctx} /> : null}
+          </View>
+          {items.map((m, i) =>
+            i === heroIndex ? null : (
+              <View key={i} style={{ ...rule, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 8 }}>
+                <View>
+                  <Text style={{ fontSize: 8.5, fontFamily: ctx.f.bold, color: ctx.text }}>{m.label}</Text>
+                  {m.sublabel ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 1 }}>{m.sublabel}</Text> : null}
+                </View>
+                <Text style={{ fontSize: 14, lineHeight: 1.25, fontFamily: ctx.f.bold, color: ctx.text }}>{metricDisplayValue(m)}</Text>
+              </View>
+            ),
+          )}
         </View>
       );
     }
