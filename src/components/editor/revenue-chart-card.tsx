@@ -34,6 +34,14 @@ export function RevenueChartGraphic({ chart, ahead = null, narrow = false }: { c
           <stop offset="1" stopColor="var(--doc-brand)" stopOpacity={0} />
         </linearGradient>
       </defs>
+      {g.yTicks.map((t) => (
+        <g key={t.text}>
+          <line x1={0} y1={t.y} x2={g.width} y2={t.y} stroke={st.grid} strokeWidth={1} />
+          <text x={2} y={t.y - 4} fontSize={st.fontSize} fill={st.label} style={{ fontVariantNumeric: "tabular-nums" }}>
+            {t.text}
+          </text>
+        </g>
+      ))}
       <line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
       {g.proposedPath ? (
         <path d={g.proposedPath} fill="none" stroke="var(--doc-brand)" strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />

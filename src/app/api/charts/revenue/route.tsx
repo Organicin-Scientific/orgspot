@@ -58,6 +58,11 @@ export async function GET(req: NextRequest) {
       <div style={{ display: "flex", position: "relative", width: "100%", height: "100%", backgroundColor: CHART_SURFACE }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} width={g.width * SCALE} height={g.height * SCALE} alt="" style={{ position: "absolute", left: 0, top: 0 }} />
+        {g.yTicks.map((t) => (
+          <div key={t.text} style={{ ...abs, left: 2 * SCALE, top: top(t.y - 4, st.fontSize), fontSize: st.fontSize * SCALE, color: st.label }}>
+            {t.text}
+          </div>
+        ))}
         {g.labels.flatMap((l) => [
           <div key={l.kind + "v"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.valueY, st.valueSize), fontSize: st.valueSize * SCALE, fontWeight: 700, color: st.valueColor }}>
             {l.value}

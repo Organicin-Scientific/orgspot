@@ -134,6 +134,9 @@ function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx;
             <Stop offset="1" stopColor={ctx.color} stopOpacity={0} />
           </LinearGradient>
         </Defs>
+        {g.yTicks.map((t) => (
+          <Line key={t.text} x1={0} y1={t.y} x2={g.width} y2={t.y} stroke={st.grid} strokeWidth={1} />
+        ))}
         <Line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
         {g.proposedPath ? (
           <Path d={g.proposedPath} fill="none" stroke={ctx.color} strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />
@@ -143,6 +146,11 @@ function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx;
         <Path d={g.linePath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
         <Circle cx={g.end.x} cy={g.end.y} r={st.dot} fill={ctx.color} stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
       </Svg>
+      {g.yTicks.map((t) => (
+        <Text key={t.text} style={{ ...abs, left: 2 * k, top: top(t.y - 4, st.fontSize), fontSize: st.fontSize * k * 0.75, color: st.label }}>
+          {t.text}
+        </Text>
+      ))}
       {g.labels.map((l) => (
         <View
           key={l.kind}
