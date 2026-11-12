@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   chartAltText,
   chartAheadFrom,
+  chartDefinitions,
   chartGeometry,
   parseShortUsd,
   chartTotal,
@@ -64,7 +65,8 @@ describe("revenue chart", () => {
     expect(g.ticks.map((t) => t.label)).toEqual(["Jan", "Aug"]);
     expect(chartGeometry({ year: 2026, months: [5_000] }).ticks.map((t) => t.label)).toEqual(["Jan"]);
     // No y-axis: the figure is labelled on the line.
-    expect(g.labels.map((l) => [l.name, l.value, l.sub])).toEqual([["Revenue YTD", "$239K", "cash received since Jan 1"]]);
+    expect(g.labels.map((l) => [l.name, l.value])).toEqual([["Revenue YTD", "$239K"]]);
+    expect(chartDefinitions(g)).toEqual([{ name: "Revenue YTD", text: "cash paid by customers (cash basis)." }]);
     expect(chartAltText(chart)).toBe("Revenue YTD: $239K cash received from customers, January through August 2026.");
   });
 
@@ -142,8 +144,9 @@ describe("email", () => {
     expect(rendered.html).toContain("Revenue YTD: $239K cash received from customers, January through August 2026.");
     expect(rendered.html).toContain("Contracted backlog: $400K, signed, not yet collected (dashed line). Pipeline: $800K, proposed, not yet signed (dotted line). Both continue the line without dates.");
     // The chart carries every figure, so the email drops the backlog and pipeline rows.
-    expect(rendered.html).toContain("Contracted backlog and pipeline are shown without dates.");
-    // No separate rows: the name appears only in the alt text and the footnote.
+    expect(rendered.html).toContain("cash paid by customers (cash basis).");
+    expect(rendered.html).not.toContain("shown without dates");
+    // No separate rows: the name appears in the alt text and the definitions.
     expect(rendered.html.match(/Contracted backlog/g)?.length).toBe(2);
   });
 });
@@ -167,15 +170,16 @@ describe("outlook", () => {
     // Both lines leave from the last received point.
     expect(g.signedPath!.startsWith(`M${g.end.x} ${g.end.y}`)).toBe(true);
     expect(g.proposedPath!.startsWith(`M${g.end.x} ${g.end.y}`)).toBe(true);
-    // Each line carries its own metric's name, figure and definition.
-    expect(g.labels.map((l) => [l.name, l.value, l.sub])).toEqual([
-      ["Revenue YTD", "$183K", "cash received since Jan 1"],
-      ["Contracted backlog", "$121K", "signed, not yet collected"],
-      ["Pipeline", "$233K", "proposed, not yet signed"],
+    // Each line carries its own metric's figure and name; definitions go under the chart.
+    expect(g.labels.map((l) => [l.value, l.name])).toEqual([
+      ["$183K", "Revenue YTD"],
+      ["$121K", "Contracted backlog"],
+      ["$233K", "Pipeline"],
     ]);
+    expect(chartDefinitions(g).map((d) => d.name)).toEqual(["Revenue YTD", "Contracted backlog", "Pipeline"]);
     // Proposed sits above signed, and every label stays inside the drawing.
     const [, s, p] = g.labels;
-    expect(p!.subY).toBeLessThan(s!.valueY);
+    expect(p!.nameY).toBeLessThan(s!.valueY);
     expect(Math.min(...g.labels.map((l) => l.valueY))).toBeGreaterThan(12);
   });
 
@@ -189,6 +193,6 @@ describe("outlook", () => {
   it("keeps close tails' labels apart", () => {
     const g = chartGeometry(chart, { contracted: 121000, proposed: 5000 });
     const [, s, p] = g.labels;
-    expect(s!.valueY - p!.subY).toBeGreaterThanOrEqual(12);
+    expect(s!.valueY - p!.nameY).toBeGreaterThanOrEqual(12);
   });
 });

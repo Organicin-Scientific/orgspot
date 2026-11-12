@@ -2,7 +2,7 @@ import "server-only";
 import path from "node:path";
 import * as React from "react";
 import { Circle, Defs, Document, Font, Image, Line, LinearGradient, Link, Page, Path, Stop, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { CHART_FOOTNOTE, CHART_STYLE, CHART_SURFACE, chartAheadFrom, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
+import { CHART_STYLE, chartDefinitions, CHART_SURFACE, chartAheadFrom, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 import { metricDisplayValue } from "@/lib/content/template";
 import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
@@ -149,8 +149,7 @@ function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx;
           style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * k } : { left: l.x * k }), top: top(l.valueY, st.valueSize), alignItems: l.anchor === "end" ? "flex-end" : "flex-start" }}
         >
           <Text style={{ fontSize: st.valueSize * k * 0.75, lineHeight: 1.05, fontFamily: ctx.f.bold, color: st.valueColor }}>{l.value}</Text>
-          <Text style={{ fontSize: st.nameSize * k * 0.75, lineHeight: 1.1, fontFamily: ctx.f.bold, color: st.valueColor, marginTop: 1 }}>{l.name}</Text>
-          <Text style={{ fontSize: st.subSize * k * 0.75, lineHeight: 1.1, color: st.subColor, marginTop: 1 }}>{l.sub}</Text>
+          <Text style={{ fontSize: st.nameSize * k * 0.75, lineHeight: 1.1, color: st.nameColor, marginTop: 1 }}>{l.name}</Text>
         </View>
       ))}
       {g.ticks.map((t) => (
@@ -315,7 +314,13 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
         return (
           <View style={{ ...card, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 10 }} wrap={false}>
             <PdfRevenueChart chart={hero.chart} ctx={ctx} ahead={ahead} />
-            {ahead ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 2 }}>{CHART_FOOTNOTE}</Text> : null}
+            <View style={{ marginTop: 3, gap: 1 }}>
+              {chartDefinitions(chartGeometry(hero.chart, ahead)).map((d) => (
+                <Text key={d.name} style={{ fontSize: 7, lineHeight: 1.4, color: MUTED }}>
+                  <Text style={{ fontFamily: ctx.f.bold, color: "#5b6561" }}>{d.name}:</Text> {d.text}
+                </Text>
+              ))}
+            </View>
           </View>
         );
       }

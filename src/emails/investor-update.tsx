@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Body, Container, Head, Html, Img, Link, Preview } from "@react-email/components";
 import { QUOTE_GREY } from "@/lib/brand";
-import { CHART_FOOTNOTE, CHART_SIZE, chartAheadFrom, chartAltText, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
+import { CHART_SIZE, chartAheadFrom, chartAltText, chartDefinitions, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 import type { BlockNode, DocNode, InlineNode, Mark, MetricItem } from "@/lib/content/schema";
 import { metricDisplayValue } from "@/lib/content/template";
 
@@ -133,17 +133,15 @@ function OutlookCard({ chart, ahead, ctx }: { chart: RevenueChart; ahead: ChartA
             />
           </td>
         </tr>
-        {ahead ? (
-          <tr>
-            <td style={{ padding: "6px 20px 14px" }}>
-              <p style={textStyle(ctx.m, { margin: "0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{CHART_FOOTNOTE}</p>
-            </td>
-          </tr>
-        ) : (
-          <tr>
-            <td style={{ padding: "0 0 12px" }} />
-          </tr>
-        )}
+        <tr>
+          <td style={{ padding: "6px 20px 14px" }}>
+            {chartDefinitions(chartGeometry(chart, ahead)).map((d) => (
+              <p key={d.name} style={textStyle(ctx.m, { margin: "0", fontSize: "11px", lineHeight: "16px", color: MUTED })}>
+                <strong style={{ fontWeight: 600, color: METRIC_LABEL }}>{d.name}:</strong> {d.text}
+              </p>
+            ))}
+          </td>
+        </tr>
       </tbody>
     </table>
   );

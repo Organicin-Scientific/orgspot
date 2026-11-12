@@ -110,18 +110,16 @@ export interface ChartTick {
   anchor: "start" | "middle" | "end";
 }
 
-/** A direct label: the metric's figure, its name, and its definition, aligned to x. */
+/** A direct label: the metric's figure above its name, aligned to x. Definitions sit under the chart. */
 export interface ChartLabel {
   kind: "received" | "signed" | "proposed";
   x: number;
   anchor: "start" | "end";
-  /** Baselines of the three lines. */
+  /** Baselines of the two lines. */
   valueY: number;
   nameY: number;
-  subY: number;
   value: string;
   name: string;
-  sub: string;
 }
 
 export interface ChartGeometry {
@@ -153,12 +151,11 @@ export const CHART_STYLE = {
   fillOpacity: 0.16,
   baseline: "#e3e8e6",
   label: "#8a938f",
-  fontSize: 11,
-  valueSize: 16,
-  nameSize: 12.5,
-  subSize: 11.5,
+  fontSize: 10,
+  valueSize: 14,
+  nameSize: 11,
   valueColor: "#1f2623",
-  subColor: "#8a938f",
+  nameColor: "#5b6561",
   dashSigned: "7 5",
   dashProposed: "0.5 5",
   /** Proposals are the least certain money, so their line sits back a little. */
@@ -172,7 +169,7 @@ export function chartGeometry(
 ): ChartGeometry {
   const { width, height } = size;
   // Top padding holds the highest label; there is no y-axis, every figure is labelled.
-  const pad = { top: 58, right: 8, bottom: 24, left: 6 };
+  const pad = { top: 38, right: 8, bottom: 22, left: 6 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const baseY = pad.top + plotH;
@@ -217,19 +214,17 @@ export function chartGeometry(
   const signedPath = signedAdd > 0 ? fan(signed, narrow ? 0.11 : 0.18) : null;
   const proposedPath = proposedAdd > 0 ? fan(proposed, narrow ? 0.16 : 0.27) : null;
 
-  // Each line is labelled with its own metric: the figure, the name, the definition. Labels
-  // sit above their line; when two tails are close, they're kept apart.
-  const GAP = 54;
+  // Each line is labelled with its own metric's figure and name. Labels sit above their line;
+  // when two tails are close, they're kept apart.
+  const GAP = 34;
   const label = (kind: ChartLabel["kind"], name: string, lx: number, anchorY: number, value: number, anchor: ChartLabel["anchor"] = "end"): ChartLabel => ({
     kind,
     x: f(lx),
     anchor,
-    valueY: f(anchorY - 38),
-    nameY: f(anchorY - 22),
-    subY: f(anchorY - 8),
+    valueY: f(anchorY - 20),
+    nameY: f(anchorY - 7),
     value: formatShortUsd(value),
     name,
-    sub: METRIC_DEFINITIONS[name as keyof typeof METRIC_DEFINITIONS],
   });
   // Revenue YTD sits over the received line: ending at its last point, or, in a narrow drawing
   // with work ahead, starting from the left edge where there's room for its definition.
@@ -239,10 +234,10 @@ export function chartGeometry(
       : label("received", REVENUE_YTD_LABEL, hasAhead ? last.x - 8 : xEnd, last.y - (hasAhead ? 4 : 8), received);
   const labels: ChartLabel[] = [receivedLabel];
   const signedY = y(signed);
-  const proposedY = proposedPath ? Math.max(50, signedPath ? Math.min(y(proposed), signedY - GAP) : y(proposed)) : 0;
+  const proposedY = proposedPath ? Math.max(32, signedPath ? Math.min(y(proposed), signedY - GAP) : y(proposed)) : 0;
   // If the tails are too close to stack both labels above, the backlog label drops below its line.
   const signedBelow = Boolean(proposedPath && signedPath && signedY - proposedY < GAP);
-  if (signedPath) labels.push(label("signed", CONTRACTED_LABEL, xEnd, signedBelow ? signedY + 48 : signedY, signedAdd));
+  if (signedPath) labels.push(label("signed", CONTRACTED_LABEL, xEnd, signedBelow ? signedY + 30 : signedY, signedAdd));
   if (proposedPath) labels.push(label("proposed", PIPELINE_LABEL, xEnd, proposedY, proposedAdd));
 
   const monthTick: ChartTick = hasAhead
@@ -256,8 +251,20 @@ export function chartGeometry(
 /** The metric card's background. The end dot's ring matches it so the dot reads as cut out of the line. */
 export const CHART_SURFACE = "#ffffff";
 
-/** One line under the chart for every renderer. */
-export const CHART_FOOTNOTE = "Contracted backlog and pipeline are shown without dates.";
+/**
+ * Definitions printed under the chart, one per line drawn, in plain technical English: short,
+ * present tense, one fact each. Investors check the figures against these.
+ */
+export const CHART_DEFINITIONS = {
+  [REVENUE_YTD_LABEL]: "cash paid by customers (cash basis).",
+  [CONTRACTED_LABEL]: "signed work, not paid yet.",
+  [PIPELINE_LABEL]: "proposals, not signed yet.",
+} as const;
+
+/** The definition lines for a chart: only the metrics it draws. */
+export function chartDefinitions(g: ChartGeometry): { name: string; text: string }[] {
+  return g.labels.map((l) => ({ name: l.name, text: CHART_DEFINITIONS[l.name as keyof typeof CHART_DEFINITIONS] }));
+}
 
 /**
  * The chart's marks as an SVG string, with no text: the email image draws its labels with the

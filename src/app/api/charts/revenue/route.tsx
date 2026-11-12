@@ -62,11 +62,11 @@ export async function GET(req: NextRequest) {
           <div key={l.kind + "v"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.valueY, st.valueSize), fontSize: st.valueSize * SCALE, fontWeight: 700, color: st.valueColor }}>
             {l.value}
           </div>,
-          <div key={l.kind + "n"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.nameY, st.nameSize), fontSize: st.nameSize * SCALE, fontWeight: 700, color: st.valueColor }}>
+          <div
+            key={l.kind + "n"}
+            style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.nameY, st.nameSize), fontSize: st.nameSize * SCALE, color: st.nameColor }}
+          >
             {l.name}
-          </div>,
-          <div key={l.kind + "s"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.subY, st.subSize), fontSize: st.subSize * SCALE, color: st.subColor }}>
-            {l.sub}
           </div>,
         ])}
         {g.ticks.map((t) => (

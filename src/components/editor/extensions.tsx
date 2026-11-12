@@ -11,7 +11,7 @@ import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewP
 import StarterKit from "@tiptap/starter-kit";
 import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
-import { CHART_FOOTNOTE, chartAheadFrom, chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, PIPELINE_LABEL, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { chartAheadFrom, chartDefinitions, chartGeometry, chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, PIPELINE_LABEL, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
 import { isStandingMetrics, METRIC_PROMPTS, PROMPT_OPEN, standingPromptItems } from "@/lib/content/template";
 import { LineSwatch, MonthlyFiguresPopover, RevenueChartGraphic } from "./revenue-chart-card";
 import { cn } from "@/lib/utils";
@@ -86,7 +86,13 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
               <div className="mt-1 @[26rem]:hidden">
                 <RevenueChartGraphic chart={charted} ahead={ahead} narrow />
               </div>
-              {ahead ? <p className="mt-1 select-none px-2 text-[12px] text-[#8a938f]">{CHART_FOOTNOTE}</p> : null}
+              <div className="mt-1.5 select-none px-2 text-[11px] leading-4 text-[#8a938f]">
+                {chartDefinitions(chartGeometry(charted, ahead)).map((d) => (
+                  <p key={d.name}>
+                    <span className="font-semibold text-[#5b6561]">{d.name}:</span> {d.text}
+                  </p>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-3 px-5 pt-4 pb-4 @[26rem]:flex-row @[26rem]:items-end @[26rem]:justify-between">
