@@ -4,46 +4,56 @@ import { useId, useMemo, useState } from "react";
 import { LineChart } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  CHART_SIZE,
+  CHART_SIZE_NARROW,
   CHART_STYLE,
   CHART_SURFACE,
+  chartAltText,
   chartGeometry,
-  chartTotal,
-  formatShortUsd,
+  type ChartAhead,
   MONTH_NAMES,
   MONTH_SHORT,
   type RevenueChart,
 } from "@/lib/content/revenue-chart";
-import { cn } from "@/lib/utils";
 
 /**
- * The Revenue YTD chart in the editor, drawn from the same geometry as the email image and
- * the PDF. Brand line, soft fill, one end dot, first and last month, one scale label. No grid, no legend.
+ * The Revenue YTD chart in the editor, drawn from the same geometry as the email image and the
+ * PDF: the received line, then signed (dashed) and proposed (dotted) fanning out with no dates,
+ * each labelled directly. Static, like the email and the PDF it previews.
  */
-export function RevenueChartGraphic({ chart, className }: { chart: RevenueChart; className?: string }) {
-  const g = chartGeometry(chart);
+export function RevenueChartGraphic({ chart, ahead = null, narrow = false }: { chart: RevenueChart; ahead?: ChartAhead | null; narrow?: boolean }) {
+  const g = chartGeometry(chart, ahead, narrow ? CHART_SIZE_NARROW : CHART_SIZE);
   const gradientId = useId().replace(/:/g, "");
+  const st = CHART_STYLE;
+  const halo = { paintOrder: "stroke" as const, stroke: CHART_SURFACE, strokeWidth: 5, strokeLinejoin: "round" as const };
   return (
-    <svg
-      viewBox={`0 0 ${g.width} ${g.height}`}
-      className={cn("block h-auto w-full max-w-[232px]", className)}
-      role="img"
-      aria-label={`Cumulative cash received, January through ${MONTH_NAMES[chart.months.length - 1]} ${chart.year}`}
-    >
+    <svg viewBox={`0 0 ${g.width} ${g.height}`} className="block h-auto w-full" role="img" aria-label={chartAltText(chart, ahead)}>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--doc-brand)" stopOpacity={CHART_STYLE.fillOpacity} />
+          <stop offset="0" stopColor="var(--doc-brand)" stopOpacity={st.fillOpacity} />
           <stop offset="1" stopColor="var(--doc-brand)" stopOpacity={0} />
         </linearGradient>
       </defs>
-      <line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={CHART_STYLE.baseline} strokeWidth={1} />
+      <line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
+      {g.proposedPath ? (
+        <path d={g.proposedPath} fill="none" stroke="var(--doc-brand)" strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />
+      ) : null}
+      {g.signedPath ? <path d={g.signedPath} fill="none" stroke="var(--doc-brand)" strokeWidth={st.stroke} strokeDasharray={st.dashSigned} /> : null}
       <path d={g.areaPath} fill={`url(#${gradientId})`} />
-      <path d={g.linePath} fill="none" stroke="var(--doc-brand)" strokeWidth={CHART_STYLE.stroke} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={g.end.x} cy={g.end.y} r={CHART_STYLE.dot} fill="var(--doc-brand)" stroke={CHART_SURFACE} strokeWidth={CHART_STYLE.dotRing} />
-      <text x={2} y={g.yLabel.y + 8} fontSize={CHART_STYLE.fontSize} fill={CHART_STYLE.label}>
-        {g.yLabel.text}
-      </text>
+      <path d={g.linePath} fill="none" stroke="var(--doc-brand)" strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={g.end.x} cy={g.end.y} r={st.dot} fill="var(--doc-brand)" stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
+      {g.labels.map((l) => (
+        <g key={l.kind}>
+          <text x={l.x} y={l.valueY} textAnchor={l.anchor} fontSize={st.valueSize} fontWeight={800} fill={st.valueColor} style={{ ...halo, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
+            {l.value}
+          </text>
+          <text x={l.x} y={l.nameY} textAnchor={l.anchor} fontSize={st.nameSize} fill={st.nameColor} style={halo}>
+            {l.name}
+          </text>
+        </g>
+      ))}
       {g.ticks.map((t) => (
-        <text key={t.anchor} x={t.x} y={g.baseY + 12} fontSize={CHART_STYLE.fontSize} textAnchor={t.anchor} fill={CHART_STYLE.label}>
+        <text key={t.label + t.anchor} x={t.x} y={g.baseY + 16} fontSize={st.fontSize} textAnchor={t.anchor} fill={st.label}>
           {t.label}
         </text>
       ))}
@@ -154,8 +164,7 @@ export function MonthlyFiguresPopover({
           ))}
         </div>
         <div className="rounded-md bg-[#f6f8f7] px-2 pt-2 pb-1">
-          <p className="text-center text-lg font-bold tabular-nums text-[var(--doc-brand)]">{formatShortUsd(chartTotal(draft))}</p>
-          <RevenueChartGraphic chart={draft} className="mx-auto" />
+          <RevenueChartGraphic chart={draft} narrow />
         </div>
         <div className="flex items-center justify-between">
           {chart ? (
@@ -185,5 +194,24 @@ export function MonthlyFiguresPopover({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** A short line sample beside a row label: which line on the chart the figure draws. */
+export function LineSwatch({ kind }: { kind: "signed" | "proposed" }) {
+  return (
+    <svg width="16" height="6" viewBox="0 0 16 6" aria-hidden="true" className="mr-1.5 inline-block shrink-0 align-middle">
+      <line
+        x1="1"
+        y1="3"
+        x2="15"
+        y2="3"
+        stroke="var(--doc-brand)"
+        strokeOpacity={kind === "proposed" ? CHART_STYLE.proposedOpacity : 1}
+        strokeWidth={2}
+        strokeDasharray={kind === "signed" ? CHART_STYLE.dashSigned : CHART_STYLE.dashProposed}
+        strokeLinecap={kind === "proposed" ? "round" : "butt"}
+      />
+    </svg>
   );
 }

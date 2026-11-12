@@ -67,6 +67,7 @@ export function fileToken(campaignId: string, recipientId: string, fileKey: stri
  * Signs the figures behind a Revenue YTD chart image so the public chart route only draws
  * what this app put in an email. Deterministic, so a retried send renders identical HTML.
  */
-export function chartToken(year: number, months: string, color: string) {
-  return createToken("chart", [String(year), months, color]);
+export function chartToken(year: number, months: string, color: string, ahead: { contracted: number; proposed: number } | null = null) {
+  if (!ahead) return createToken("chart", [String(year), months, color]);
+  return createToken("chart", [String(year), months, color, String(Math.round(ahead.contracted)), String(Math.round(ahead.proposed))]);
 }
