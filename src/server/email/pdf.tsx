@@ -1,13 +1,14 @@
 import "server-only";
 import path from "node:path";
 import * as React from "react";
-import { Circle, Defs, Document, Font, Image, Line, LinearGradient, Link, Page, Path, Stop, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { CHART_STYLE, chartDefinitions, CHART_SURFACE, chartAheadFrom, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
+import { Document, Font, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { CHART_SIZE, chartDefinitions, CHART_SURFACE, chartAheadFrom, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 import { metricDisplayValue } from "@/lib/content/template";
 import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
 import type { AppSettings } from "@/lib/types";
 import { loadAssetBuffers } from "../storage";
+import { revenueChartPng } from "../charts/revenue-png";
 import { DEFAULT_LEAF_PNG, DEFAULT_LOGO_PNG } from "./default-logo";
 
 type ImageMap = Map<string, { buf: Buffer; mime: string }>;
@@ -25,6 +26,7 @@ interface Ctx {
   text: string;
   images: ImageMap;
   f: Faces;
+  charts: Map<string, Buffer>;
 }
 
 const HELVETICA: Faces = {
@@ -117,65 +119,37 @@ function Inline({ nodes, ctx }: { nodes?: InlineNode[]; ctx: Ctx }) {
   );
 }
 
-/** The Revenue YTD chart as vector marks, from the same geometry as the email image. */
+/** The Revenue YTD chart: the same PNG the email and the editor show, prerendered per figure set. */
 function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx; ahead: ChartAhead | null }) {
-  const g = chartGeometry(chart, ahead);
-  const st = CHART_STYLE;
-  const k = 1.12; // points per CSS pixel: the chart spans the card's width on an A4/Letter page
-  const abs = { position: "absolute" as const };
-  // react-pdf places text by its top edge; geometry gives baselines.
-  const top = (baseline: number, size: number) => (baseline - size * 0.82) * k;
-  return (
-    <View style={{ width: g.width * k, height: g.height * k, position: "relative", alignSelf: "center" }}>
-      <Svg width={g.width * k} height={g.height * k} viewBox={`0 0 ${g.width} ${g.height}`}>
-        <Defs>
-          <LinearGradient id="rv" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={ctx.color} stopOpacity={st.fillOpacity} />
-            <Stop offset="1" stopColor={ctx.color} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
-        {g.yTicks.map((t) => (
-          <Line key={t.text} x1={0} y1={t.y} x2={g.width} y2={t.y} stroke={st.grid} strokeWidth={1} />
-        ))}
-        <Line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
-        {g.proposedPath ? (
-          <Path d={g.proposedPath} fill="none" stroke={ctx.color} strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />
-        ) : null}
-        {g.signedPath ? <Path d={g.signedPath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeDasharray={st.dashSigned} /> : null}
-        <Path d={g.areaPath} fill="url(#rv)" />
-        <Path d={g.linePath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
-        <Circle cx={g.end.x} cy={g.end.y} r={st.dot} fill={ctx.color} stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
-      </Svg>
-      {g.yTicks.map((t) => (
-        <Text key={t.text} style={{ ...abs, left: 2 * k, top: top(t.y - 4, st.fontSize), fontSize: st.fontSize * k * 0.75, color: st.label }}>
-          {t.text}
-        </Text>
-      ))}
-      {g.labels.map((l) => (
-        <View
-          key={l.kind}
-          style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * k } : { left: l.x * k }), top: top(l.valueY, st.valueSize), alignItems: l.anchor === "end" ? "flex-end" : "flex-start" }}
-        >
-          <Text style={{ fontSize: st.valueSize * k * 0.75, lineHeight: 1.05, fontFamily: ctx.f.bold, color: st.valueColor }}>{l.value}</Text>
-          <Text style={{ fontSize: st.nameSize * k * 0.75, lineHeight: 1.1, color: st.nameColor, marginTop: 1 }}>{l.name}</Text>
-        </View>
-      ))}
-      {g.ticks.map((t) => (
-        <Text
-          key={t.label + t.anchor}
-          style={{
-            ...abs,
-            fontSize: st.fontSize * k * 0.75,
-            color: st.label,
-            top: (g.baseY + 6) * k,
-            ...(t.anchor === "start" ? { left: t.x * k } : t.anchor === "end" ? { right: (g.width - t.x) * k } : { left: (t.x - 20) * k, width: 40 * k, textAlign: "center" as const }),
-          }}
-        >
-          {t.label}
-        </Text>
-      ))}
-    </View>
-  );
+  const png = ctx.charts.get(chartKey(chart, ahead));
+  if (!png) return null;
+  const w = CHART_SIZE.width * 1.12; // points: the chart spans the card's width on a Letter page
+  // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf images take no alt
+  return <Image src={{ data: png, format: "png" }} style={{ width: w, height: (w * CHART_SIZE.height) / CHART_SIZE.width, alignSelf: "center" }} />;
+}
+
+const chartKey = (chart: RevenueChart, ahead: ChartAhead | null) => JSON.stringify([chart, ahead]);
+
+/** Every Revenue YTD chart in the doc, drawn once before the PDF renders (react-pdf is synchronous). */
+async function prerenderCharts(doc: DocNode, color: string): Promise<Map<string, Buffer>> {
+  const out = new Map<string, Buffer>();
+  const walk = async (nodes: unknown[]) => {
+    for (const raw of nodes) {
+      const n = raw as BlockNode;
+      if (n.type === "metrics") {
+        const hero = n.attrs.items.find((m) => m.label === REVENUE_YTD_LABEL);
+        if (hero && hasChartData(hero.chart)) {
+          const ahead = chartAheadFrom(n.attrs.items);
+          const key = chartKey(hero.chart, ahead);
+          if (!out.has(key)) out.set(key, await revenueChartPng(hero.chart, color, ahead));
+        }
+      }
+      const kids = (raw as { content?: unknown[] }).content;
+      if (Array.isArray(kids)) await walk(kids);
+    }
+  };
+  await walk(doc.content);
+  return out;
 }
 
 function isBoldLabel(node: Extract<BlockNode, { type: "paragraph" }>): boolean {
@@ -437,7 +411,8 @@ export async function renderUpdatePdf(input: PdfInput): Promise<Buffer> {
   const b = input.settings.branding;
   const f = b.fontFamily === "nunito" ? NUNITO : HELVETICA;
   if (f === NUNITO) registerNunito();
-  const ctx: Ctx = { color: b.primaryColor, text: b.textColor, images, f };
+  const charts = await prerenderCharts(input.content, b.primaryColor);
+  const ctx: Ctx = { color: b.primaryColor, text: b.textColor, images, f, charts };
   const logo = b.logoAssetId ? pdfImage(images, b.logoAssetId) : { data: DEFAULT_LOGO_PNG, format: "png" as const };
   const banner = pdfImage(images, input.bannerAssetId);
   const doc = (
