@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   chartAltText,
+  chartAheadFrom,
   chartGeometry,
+  parseShortUsd,
   chartTotal,
   decodeChart,
   encodeChartMonths,
@@ -61,7 +63,8 @@ describe("revenue chart", () => {
     expect(g.end.y).toBeLessThan(g.baseY);
     expect(g.ticks.map((t) => t.label)).toEqual(["Jan", "Aug"]);
     expect(chartGeometry({ year: 2026, months: [5_000] }).ticks.map((t) => t.label)).toEqual(["Jan"]);
-    expect(g.yLabel.text).toBe("$250K");
+    // No y-axis: the figure is labelled on the line.
+    expect(g.labels.map((l) => [l.kind, l.value, l.sub])).toEqual([["received", "$239K", "received"]]);
     expect(chartAltText(chart)).toBe("Revenue YTD: $239K cash received from customers, January through August 2026.");
   });
 
@@ -112,7 +115,7 @@ describe("standing strip", () => {
 });
 
 describe("email", () => {
-  it("shows the chart as a signed static image with alt text, beside the hero figure", async () => {
+  it("shows the chart as a signed static image whose alt text names every figure", async () => {
     const { renderUpdateEmail } = await import("@/server/email/render");
     const { verifyToken } = await import("@/server/tokens");
     const rendered = await renderUpdateEmail({
@@ -134,11 +137,57 @@ describe("email", () => {
     const src = rendered.html.match(/src="(https:\/\/app\.example\.test\/api\/charts\/revenue\?c=[^"]+)"/)?.[1];
     expect(src).toBeTruthy();
     const token = decodeURIComponent(new URL(src!.replace(/&amp;/g, "&")).searchParams.get("c")!);
-    expect(verifyToken("chart", token, 3)).toEqual(["2026", "0,40000,0,60000,0,0,139000,0", "#157A6E"]);
-    expect(rendered.html).toContain('alt="Revenue YTD: $239K cash received from customers, January through August 2026."');
-    // Ledger card: chart cell beside the hero figure, then the other figures as rows.
-    expect(rendered.html).toContain('width="46%"');
-    expect(rendered.html.indexOf("$239K")).toBeLessThan(rendered.html.indexOf("Contracted backlog"));
-    expect(rendered.html.indexOf("Contracted backlog")).toBeLessThan(rendered.html.indexOf("$400K"));
+    // The token carries the trajectory: contracted ($400K) and proposed ($800K+) past August.
+    expect(verifyToken("chart", token, 5)).toEqual(["2026", "0,40000,0,60000,0,0,139000,0", "#157A6E", "400000", "800000"]);
+    expect(rendered.html).toContain("Revenue YTD: $239K cash received from customers, January through August 2026.");
+    expect(rendered.html).toContain("$639K with $400K of signed work not yet collected (dashed line). $1.4M with $800K of proposals not yet signed (dotted line). The signed and proposed work has no dates.");
+    // The chart carries every figure, so the email drops the backlog and pipeline rows.
+    expect(rendered.html).toContain("Signed and proposed work is shown without dates.");
+    expect(rendered.html).not.toContain("Contracted backlog");
+  });
+});
+
+describe("outlook", () => {
+  const chart = { year: 2026, months: [14600, 0, 700, 0, 24400, 0, 58300, 64000, 0, 21400] };
+
+  it("reads the work ahead from the strip and ignores prompts", () => {
+    expect(parseShortUsd("$121K")).toBe(121000);
+    expect(parseShortUsd("$1.2M")).toBe(1200000);
+    expect(parseShortUsd("$800K+")).toBe(800000);
+    expect(parseShortUsd("[Write: open proposals]")).toBe(0);
+    expect(chartAheadFrom([{ label: "Contracted backlog", value: "[Write: x]" }, { label: "Pipeline", value: "" }])).toBeNull();
+  });
+
+  it("stops time at the as-of month and fans signed and proposed out above the total", () => {
+    const g = chartGeometry(chart, { contracted: 121000, proposed: 233000 });
+    expect(g.ticks.map((t) => t.label)).toEqual(["Jan", "Oct"]);
+    expect(g.ticks.at(-1)!.x).toBe(g.end.x);
+    expect(g.end.x).toBeLessThan(g.width * 0.6);
+    // Both lines leave from the last received point.
+    expect(g.signedPath!.startsWith(`M${g.end.x} ${g.end.y}`)).toBe(true);
+    expect(g.proposedPath!.startsWith(`M${g.end.x} ${g.end.y}`)).toBe(true);
+    // Labels add up as shown: $183K + $121K = $304K, + $233K = $537K.
+    expect(g.labels.map((l) => [l.value, l.sub])).toEqual([
+      ["$183K", "received"],
+      ["$304K", "+$121K signed"],
+      ["$537K", "+$233K proposed"],
+    ]);
+    // Proposed sits above signed, and every label stays inside the drawing.
+    const [, s, p] = g.labels;
+    expect(p!.subY).toBeLessThan(s!.valueY);
+    expect(Math.min(...g.labels.map((l) => l.valueY))).toBeGreaterThan(12);
+  });
+
+  it("draws only the lines that have money behind them", () => {
+    const g = chartGeometry(chart, { contracted: 0, proposed: 233000 });
+    expect(g.signedPath).toBeNull();
+    expect(g.labels.map((l) => l.kind)).toEqual(["received", "proposed"]);
+    expect(chartGeometry(chart).ticks.at(-1)).toMatchObject({ label: "Oct", anchor: "end" });
+  });
+
+  it("keeps close tails' labels apart", () => {
+    const g = chartGeometry(chart, { contracted: 121000, proposed: 5000 });
+    const [, s, p] = g.labels;
+    expect(s!.valueY - p!.valueY).toBeGreaterThanOrEqual(40);
   });
 });

@@ -11,9 +11,9 @@ import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewP
 import StarterKit from "@tiptap/starter-kit";
 import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
-import { chartTotal, formatShortUsd, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { CHART_FOOTNOTE, chartAheadFrom, chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, PIPELINE_LABEL, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
 import { isStandingMetrics, METRIC_PROMPTS, PROMPT_OPEN, standingPromptItems } from "@/lib/content/template";
-import { MonthlyFiguresPopover, RevenueChartGraphic } from "./revenue-chart-card";
+import { LineSwatch, MonthlyFiguresPopover, RevenueChartGraphic } from "./revenue-chart-card";
 import { cn } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -49,11 +49,15 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
         return { ...it, chart, value: formatShortUsd(chartTotal(chart)) };
       }),
     });
-  // One ledger card: the hero figure (Revenue YTD, or the first card) with its chart in the
-  // header, the rest as rows beneath. Rows never need side-by-side columns, so the strip reads
-  // the same in the narrow editor column, a phone's mail app and the PDF.
+  // With monthly figures, Revenue YTD becomes the Outlook chart and carries every figure; the
+  // rows below stay so the author can edit backlog and pipeline. Without monthly figures, it's
+  // a ledger card: the first figure leading, the rest as rows.
   const heroIndex = Math.max(0, items.findIndex((it) => it.label === REVENUE_YTD_LABEL));
   const hero = items[heroIndex];
+  const charted = hero?.label === REVENUE_YTD_LABEL && hasChartData(hero.chart) ? hero.chart : null;
+  const ahead = charted ? chartAheadFrom(items) : null;
+  const swatch = (label: string): "signed" | "proposed" | null =>
+    !ahead ? null : label === CONTRACTED_LABEL && ahead.contracted > 0 ? "signed" : label === PIPELINE_LABEL && ahead.proposed > 0 ? "proposed" : null;
 
   // Labels and basis lines are fixed (see STANDING_METRICS) so the strip stays comparable
   // quarter to quarter. Only values are editable here.
@@ -65,28 +69,47 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
     >
       {hero ? (
         <div className="@container overflow-hidden rounded-[12px] border border-[#e3e8e6] bg-white">
-          <div className="flex flex-col gap-3 px-5 pt-4 pb-4 @[26rem]:flex-row @[26rem]:items-end @[26rem]:justify-between">
-            <div className="min-w-0">
-              <p className="select-none text-[12px] font-medium tracking-[0.01em] text-[#5b6561]">{hero.label}</p>
-              {hero.label === REVENUE_YTD_LABEL ? (
-                <RevenueHeadline item={hero} />
-              ) : (
-                <MetricInput
-                  value={hero.value}
-                  placeholder="Value"
+          {charted ? (
+            <div className="px-3 pt-4 pb-3">
+              <div className="flex items-center justify-between gap-3 px-2">
+                <p className="select-none text-[12px] font-medium tracking-[0.01em] text-[#5b6561]">{REVENUE_YTD_LABEL}</p>
+                <MonthlyFiguresPopover
+                  key={JSON.stringify(charted)}
+                  chart={charted}
                   disabled={!editable}
-                  align="left"
-                  className="mt-0.5 text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-[var(--doc-brand)]"
-                  maxLength={40}
-                  onChange={(v) => setValue(heroIndex, v)}
-                  ariaLabel={`${hero.label || "Metric"} value`}
+                  onSave={(chart) => setChart(heroIndex, chart)}
+                  onClear={() => setChart(heroIndex, undefined)}
                 />
-              )}
-              {hero.sublabel ? <p className="mt-0.5 select-none text-[12px] text-[#8a938f]">{hero.sublabel}</p> : null}
+              </div>
+              <div className="mt-1 hidden @[26rem]:block">
+                <RevenueChartGraphic chart={charted} ahead={ahead} />
+              </div>
+              <div className="mt-1 @[26rem]:hidden">
+                <RevenueChartGraphic chart={charted} ahead={ahead} narrow />
+              </div>
+              {ahead ? <p className="mt-1 select-none px-2 text-[12px] text-[#8a938f]">{CHART_FOOTNOTE}</p> : null}
             </div>
-            {hero.label === REVENUE_YTD_LABEL ? (
-              <div className="flex shrink-0 flex-col items-stretch @[26rem]:w-[46%] @[26rem]:max-w-[232px] @[26rem]:items-end">
-                {hasChartData(hero.chart) ? <RevenueChartGraphic chart={hero.chart} className="max-w-none @[26rem]:max-w-[232px]" /> : null}
+          ) : (
+            <div className="flex flex-col gap-3 px-5 pt-4 pb-4 @[26rem]:flex-row @[26rem]:items-end @[26rem]:justify-between">
+              <div className="min-w-0">
+                <p className="select-none text-[12px] font-medium tracking-[0.01em] text-[#5b6561]">{hero.label}</p>
+                {hero.label === REVENUE_YTD_LABEL ? (
+                  <RevenueHeadline item={hero} />
+                ) : (
+                  <MetricInput
+                    value={hero.value}
+                    placeholder="Value"
+                    disabled={!editable}
+                    align="left"
+                    className="mt-0.5 text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-[var(--doc-brand)]"
+                    maxLength={40}
+                    onChange={(v) => setValue(heroIndex, v)}
+                    ariaLabel={`${hero.label || "Metric"} value`}
+                  />
+                )}
+                {hero.sublabel ? <p className="mt-0.5 select-none text-[12px] text-[#8a938f]">{hero.sublabel}</p> : null}
+              </div>
+              {hero.label === REVENUE_YTD_LABEL ? (
                 <MonthlyFiguresPopover
                   key={JSON.stringify(hero.chart ?? null)}
                   chart={hero.chart}
@@ -94,9 +117,9 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                   onSave={(chart) => setChart(heroIndex, chart)}
                   onClear={() => setChart(heroIndex, undefined)}
                 />
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          )}
           {items.map((it, i) =>
             i === heroIndex ? null : (
               <div
@@ -104,7 +127,10 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                 className="flex items-center justify-between gap-4 border-t border-[#eef1f0] px-5 py-3"
               >
                 <div className="min-w-0 select-none">
-                  <p className="text-[13px] font-semibold leading-tight text-[#1f2623]">{it.label}</p>
+                  <p className="flex items-center text-[13px] font-semibold leading-tight text-[#1f2623]">
+                    {swatch(it.label) ? <LineSwatch kind={swatch(it.label)!} /> : null}
+                    {it.label}
+                  </p>
                   {it.sublabel ? <p className="mt-0.5 text-[12px] leading-tight text-[#8a938f]">{it.sublabel}</p> : null}
                 </div>
                 <MetricInput

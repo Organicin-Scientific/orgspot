@@ -2,7 +2,7 @@ import "server-only";
 import path from "node:path";
 import * as React from "react";
 import { Circle, Defs, Document, Font, Image, Line, LinearGradient, Link, Page, Path, Stop, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { CHART_STYLE, CHART_SURFACE, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { CHART_FOOTNOTE, CHART_STYLE, CHART_SURFACE, chartAheadFrom, chartGeometry, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 import { metricDisplayValue } from "@/lib/content/template";
 import { QUOTE_GREY } from "@/lib/brand";
 import type { BlockNode, DocNode, InlineNode } from "@/lib/content/schema";
@@ -118,13 +118,15 @@ function Inline({ nodes, ctx }: { nodes?: InlineNode[]; ctx: Ctx }) {
 }
 
 /** The Revenue YTD chart as vector marks, from the same geometry as the email image. */
-function PdfRevenueChart({ chart, ctx }: { chart: RevenueChart; ctx: Ctx }) {
-  const g = chartGeometry(chart);
+function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx; ahead: ChartAhead | null }) {
+  const g = chartGeometry(chart, ahead);
   const st = CHART_STYLE;
-  const k = 0.78; // points per CSS pixel, sized to the ledger card's header
-  const label = { position: "absolute" as const, fontSize: 5.5, color: st.label };
+  const k = 1.12; // points per CSS pixel: the chart spans the card's width on an A4/Letter page
+  const abs = { position: "absolute" as const };
+  // react-pdf places text by its top edge; geometry gives baselines.
+  const top = (baseline: number, size: number) => (baseline - size * 0.82) * k;
   return (
-    <View style={{ width: g.width * k, height: g.height * k, position: "relative" }}>
+    <View style={{ width: g.width * k, height: g.height * k, position: "relative", alignSelf: "center" }}>
       <Svg width={g.width * k} height={g.height * k} viewBox={`0 0 ${g.width} ${g.height}`}>
         <Defs>
           <LinearGradient id="rv" x1="0" y1="0" x2="0" y2="1">
@@ -133,15 +135,30 @@ function PdfRevenueChart({ chart, ctx }: { chart: RevenueChart; ctx: Ctx }) {
           </LinearGradient>
         </Defs>
         <Line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
+        {g.proposedPath ? (
+          <Path d={g.proposedPath} fill="none" stroke={ctx.color} strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />
+        ) : null}
+        {g.signedPath ? <Path d={g.signedPath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeDasharray={st.dashSigned} /> : null}
         <Path d={g.areaPath} fill="url(#rv)" />
         <Path d={g.linePath} fill="none" stroke={ctx.color} strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
         <Circle cx={g.end.x} cy={g.end.y} r={st.dot} fill={ctx.color} stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
       </Svg>
-      <Text style={{ ...label, left: 2 * k, top: g.yLabel.y * k }}>{g.yLabel.text}</Text>
+      {g.labels.map((l) => (
+        <View key={l.kind} style={{ ...abs, right: (g.width - l.x) * k, top: top(l.valueY, st.valueSize), alignItems: "flex-end" }}>
+          <Text style={{ fontSize: st.valueSize * k * 0.75, lineHeight: 1.05, fontFamily: ctx.f.bold, color: st.valueColor }}>{l.value}</Text>
+          <Text style={{ fontSize: st.subSize * k * 0.75, lineHeight: 1.1, color: st.subColor, marginTop: 1 }}>{l.sub}</Text>
+        </View>
+      ))}
       {g.ticks.map((t) => (
         <Text
-          key={t.anchor}
-          style={{ ...label, top: (g.baseY + 2) * k, ...(t.anchor === "start" ? { left: t.x * k } : { right: (g.width - t.x) * k }) }}
+          key={t.label + t.anchor}
+          style={{
+            ...abs,
+            fontSize: st.fontSize * k * 0.75,
+            color: st.label,
+            top: (g.baseY + 6) * k,
+            ...(t.anchor === "start" ? { left: t.x * k } : t.anchor === "end" ? { right: (g.width - t.x) * k } : { left: (t.x - 20) * k, width: 40 * k, textAlign: "center" as const }),
+          }}
         >
           {t.label}
         </Text>
@@ -282,25 +299,30 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
         </View>
       );
     case "metrics": {
-      // One ledger card, as in the editor and the email: the hero figure (Revenue YTD, or the
-      // first card) with its chart, then the other figures as label-and-value rows.
+      // With monthly figures: the Outlook chart carries every figure, as in the editor and the
+      // email. Without them: a ledger card, the first figure leading and the rest as rows.
       const items = node.attrs.items;
       const heroIndex = Math.max(0, items.findIndex((m) => m.label === REVENUE_YTD_LABEL));
       const hero = items[heroIndex];
       if (!hero) return null;
+      const card = { marginTop: 4, marginBottom: 16, backgroundColor: CHART_SURFACE, borderWidth: 0.75, borderColor: "#e3e8e6", borderRadius: 8 };
+      if (hero.label === REVENUE_YTD_LABEL && hasChartData(hero.chart)) {
+        const ahead = chartAheadFrom(items);
+        return (
+          <View style={{ ...card, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 10 }} wrap={false}>
+            <Text style={{ fontSize: 8, fontFamily: ctx.f.bold, color: "#5b6561" }}>{REVENUE_YTD_LABEL}</Text>
+            <PdfRevenueChart chart={hero.chart} ctx={ctx} ahead={ahead} />
+            {ahead ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 2 }}>{CHART_FOOTNOTE}</Text> : null}
+          </View>
+        );
+      }
       const rule = { borderTopWidth: 0.75, borderTopColor: "#eef1f0" };
       return (
-        <View
-          style={{ marginTop: 4, marginBottom: 16, backgroundColor: CHART_SURFACE, borderWidth: 0.75, borderColor: "#e3e8e6", borderRadius: 8 }}
-          wrap={false}
-        >
-          <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 11 }}>
-            <View>
-              <Text style={{ fontSize: 8, fontFamily: ctx.f.bold, color: "#5b6561" }}>{hero.label}</Text>
-              <Text style={{ fontSize: 21, lineHeight: 1.25, fontFamily: ctx.f.bold, color: ctx.color, marginTop: 1 }}>{metricDisplayValue(hero)}</Text>
-              {hero.sublabel ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 1 }}>{hero.sublabel}</Text> : null}
-            </View>
-            {hasChartData(hero.chart) ? <PdfRevenueChart chart={hero.chart} ctx={ctx} /> : null}
+        <View style={card} wrap={false}>
+          <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 11 }}>
+            <Text style={{ fontSize: 8, fontFamily: ctx.f.bold, color: "#5b6561" }}>{hero.label}</Text>
+            <Text style={{ fontSize: 21, lineHeight: 1.25, fontFamily: ctx.f.bold, color: ctx.color, marginTop: 1 }}>{metricDisplayValue(hero)}</Text>
+            {hero.sublabel ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 1 }}>{hero.sublabel}</Text> : null}
           </View>
           {items.map((m, i) =>
             i === heroIndex ? null : (

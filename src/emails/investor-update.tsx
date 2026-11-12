@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Body, Container, Head, Html, Img, Link, Preview } from "@react-email/components";
 import { QUOTE_GREY } from "@/lib/brand";
-import { CHART_SIZE, chartAltText, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { CHART_FOOTNOTE, CHART_SIZE, chartAheadFrom, chartAltText, hasChartData, REVENUE_YTD_LABEL, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 import type { BlockNode, DocNode, InlineNode, Mark, MetricItem } from "@/lib/content/schema";
 import { metricDisplayValue } from "@/lib/content/template";
 
@@ -22,7 +22,7 @@ export interface EmailModel {
   bannerUrl: string | null;
   resolveImage: (assetId: string) => string;
   /** Static PNG of the Revenue YTD chart. Mail clients run no script, so the chart is an image. */
-  chartUrl: (chart: RevenueChart) => string;
+  chartUrl: (chart: RevenueChart, ahead?: ChartAhead | null) => string;
   pdf: { mode: "attach" | "link" | "none"; url: string | null; filename: string };
   attachments: { name: string; url: string }[];
   footer: { postalAddress: string; note: string; unsubscribeUrl: string; replyTo: string };
@@ -111,6 +111,49 @@ function Table({ children, style, align }: { children: React.ReactNode; style?: 
   );
 }
 
+function OutlookCard({ chart, ahead, ctx }: { chart: RevenueChart; ahead: ChartAhead | null; ctx: Ctx }) {
+  return (
+    <table
+      role="presentation"
+      width="100%"
+      cellPadding={0}
+      cellSpacing={0}
+      border={0}
+      style={{ borderCollapse: "separate", margin: "6px 0 24px", backgroundColor: "#ffffff", border: `1px solid ${METRIC_BORDER}`, borderRadius: "12px" }}
+    >
+      <tbody>
+        <tr>
+          <td style={{ padding: "16px 20px 0" }}>
+            <p style={textStyle(ctx.m, { margin: "0", fontSize: "12px", lineHeight: "16px", fontWeight: 600, color: METRIC_LABEL })}>{REVENUE_YTD_LABEL}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style={{ padding: "4px 12px 0" }}>
+            <Img
+              src={ctx.m.chartUrl(chart, ahead)}
+              alt={chartAltText(chart, ahead)}
+              width={CHART_SIZE.width}
+              height={CHART_SIZE.height}
+              style={{ display: "block", width: "100%", maxWidth: `${CHART_SIZE.width * 1.3}px`, height: "auto", border: 0, margin: "0 auto" }}
+            />
+          </td>
+        </tr>
+        {ahead ? (
+          <tr>
+            <td style={{ padding: "6px 20px 14px" }}>
+              <p style={textStyle(ctx.m, { margin: "0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{CHART_FOOTNOTE}</p>
+            </td>
+          </tr>
+        ) : (
+          <tr>
+            <td style={{ padding: "0 0 12px" }} />
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
   // One ledger card. The hero figure (Revenue YTD, or the first card) leads with its chart
   // beside it; the other figures follow as label-and-value rows. Rows keep working at any
@@ -119,7 +162,12 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
   const heroIndex = Math.max(0, items.findIndex((it) => it.label === REVENUE_YTD_LABEL));
   const hero = items[heroIndex];
   if (!hero) return null;
-  const chart = hasChartData(hero.chart) ? hero.chart : null;
+  const chart = hero.label === REVENUE_YTD_LABEL && hasChartData(hero.chart) ? hero.chart : null;
+  // The other cards extend the line past the as-of month: dashed for contracted, dotted for proposed.
+  const ahead = chart ? chartAheadFrom(items) : null;
+  // With monthly figures, the chart carries every figure: received, then signed and proposed
+  // fanning out with no dates. The rows below are the fallback when there's no chart.
+  if (chart) return <OutlookCard chart={chart} ahead={ahead} ctx={ctx} />;
   const rows = items.filter((_, i) => i !== heroIndex);
   return (
     <table
@@ -163,17 +211,6 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
                       <p style={textStyle(ctx.m, { margin: "2px 0 0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{hero.sublabel}</p>
                     ) : null}
                   </td>
-                  {chart ? (
-                    <td valign="bottom" width="46%" style={{ textAlign: "right", paddingLeft: "12px" }}>
-                      <Img
-                        src={ctx.m.chartUrl(chart)}
-                        alt={chartAltText(chart)}
-                        width={CHART_SIZE.width}
-                        height={CHART_SIZE.height}
-                        style={{ display: "inline-block", width: "100%", maxWidth: `${CHART_SIZE.width}px`, height: "auto", border: 0 }}
-                      />
-                    </td>
-                  ) : null}
                 </tr>
               </tbody>
             </table>
@@ -182,7 +219,9 @@ function Metrics({ items, ctx }: { items: MetricItem[]; ctx: Ctx }) {
         {rows.map((it, i) => (
           <tr key={i}>
             <td valign="middle" style={{ padding: "12px 0 12px 20px", borderTop: `1px solid ${METRIC_RULE}`, textAlign: "left" }}>
-              <p style={textStyle(ctx.m, { margin: "0", fontSize: "13px", lineHeight: "18px", fontWeight: 600 })}>{it.label}</p>
+              <p style={textStyle(ctx.m, { margin: "0", fontSize: "13px", lineHeight: "18px", fontWeight: 600 })}>
+                {it.label}
+              </p>
               {it.sublabel ? (
                 <p style={textStyle(ctx.m, { margin: "1px 0 0", fontSize: "12px", lineHeight: "16px", color: MUTED })}>{it.sublabel}</p>
               ) : null}
