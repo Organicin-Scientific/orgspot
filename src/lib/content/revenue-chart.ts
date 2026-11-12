@@ -321,3 +321,13 @@ export function decodeChart(year: string, months: string): RevenueChart | null {
 export function encodeChartMonths(chart: RevenueChart): string {
   return chart.months.map((v) => String(Math.round(Math.max(0, v)))).join(",");
 }
+
+/** Where the editor loads the chart image: the email's PNG, drawn from unsaved figures. */
+export function chartPreviewPath(chart: RevenueChart, ahead: ChartAhead | null): string {
+  const q = new URLSearchParams({ y: String(chart.year), m: encodeChartMonths(chart) });
+  if (ahead) {
+    q.set("c", String(Math.round(ahead.contracted)));
+    q.set("p", String(Math.round(ahead.proposed)));
+  }
+  return `/api/charts/revenue/preview?${q}`;
+}

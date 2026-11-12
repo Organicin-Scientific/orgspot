@@ -13,7 +13,7 @@ import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
 import { chartAheadFrom, chartDefinitions, chartGeometry, chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, PIPELINE_LABEL, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
 import { isStandingMetrics, METRIC_PROMPTS, PROMPT_OPEN, standingPromptItems } from "@/lib/content/template";
-import { LineSwatch, MonthlyFiguresPopover, RevenueChartGraphic } from "./revenue-chart-card";
+import { LineSwatch, MonthlyFiguresPopover, RevenueChartImage } from "./revenue-chart-card";
 import { cn } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -80,11 +80,8 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                   onClear={() => setChart(heroIndex, undefined)}
                 />
               </div>
-              <div className="mt-1 hidden @[26rem]:block">
-                <RevenueChartGraphic chart={charted} ahead={ahead} />
-              </div>
-              <div className="mt-1 @[26rem]:hidden">
-                <RevenueChartGraphic chart={charted} ahead={ahead} narrow />
+              <div className="mt-1">
+                <RevenueChartImage chart={charted} ahead={ahead} />
               </div>
               <div className="mt-1.5 select-none px-2 text-[11px] leading-4 text-[#8a938f]">
                 {chartDefinitions(chartGeometry(charted, ahead)).map((d) => (

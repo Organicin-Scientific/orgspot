@@ -1,15 +1,13 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LineChart } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CHART_SIZE,
-  CHART_SIZE_NARROW,
   CHART_STYLE,
-  CHART_SURFACE,
   chartAltText,
-  chartGeometry,
+  chartPreviewPath,
   type ChartAhead,
   MONTH_NAMES,
   MONTH_SHORT,
@@ -17,55 +15,28 @@ import {
 } from "@/lib/content/revenue-chart";
 
 /**
- * The Revenue YTD chart in the editor, drawn from the same geometry as the email image and the
- * PDF: the received line, then signed (dashed) and proposed (dotted) fanning out with no dates,
- * each labelled directly. Static, like the email and the PDF it previews.
+ * The Revenue YTD chart in the editor: the same PNG the email and the PDF carry, so the editor
+ * shows exactly what investors get. Figures settle for a moment before the image reloads, so
+ * typing a value doesn't fetch a picture per keystroke.
  */
-export function RevenueChartGraphic({ chart, ahead = null, narrow = false }: { chart: RevenueChart; ahead?: ChartAhead | null; narrow?: boolean }) {
-  const g = chartGeometry(chart, ahead, narrow ? CHART_SIZE_NARROW : CHART_SIZE);
-  const gradientId = useId().replace(/:/g, "");
-  const st = CHART_STYLE;
-  const halo = { paintOrder: "stroke" as const, stroke: CHART_SURFACE, strokeWidth: 5, strokeLinejoin: "round" as const };
+export function RevenueChartImage({ chart, ahead = null }: { chart: RevenueChart; ahead?: ChartAhead | null }) {
+  const src = chartPreviewPath(chart, ahead);
+  const [shown, setShown] = useState(src);
+  useEffect(() => {
+    if (src === shown) return;
+    const t = setTimeout(() => setShown(src), 400);
+    return () => clearTimeout(t);
+  }, [src, shown]);
   return (
-    <svg viewBox={`0 0 ${g.width} ${g.height}`} className="block h-auto w-full" role="img" aria-label={chartAltText(chart, ahead)}>
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--doc-brand)" stopOpacity={st.fillOpacity} />
-          <stop offset="1" stopColor="var(--doc-brand)" stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      {g.yTicks.map((t) => (
-        <g key={t.text}>
-          <line x1={0} y1={t.y} x2={g.width} y2={t.y} stroke={st.grid} strokeWidth={1} />
-          <text x={2} y={t.y - 4} fontSize={st.fontSize} fill={st.label} style={{ fontVariantNumeric: "tabular-nums" }}>
-            {t.text}
-          </text>
-        </g>
-      ))}
-      <line x1={0} y1={g.baseY} x2={g.width} y2={g.baseY} stroke={st.baseline} strokeWidth={1} />
-      {g.proposedPath ? (
-        <path d={g.proposedPath} fill="none" stroke="var(--doc-brand)" strokeOpacity={st.proposedOpacity} strokeWidth={st.stroke} strokeDasharray={st.dashProposed} strokeLinecap="round" />
-      ) : null}
-      {g.signedPath ? <path d={g.signedPath} fill="none" stroke="var(--doc-brand)" strokeWidth={st.stroke} strokeDasharray={st.dashSigned} /> : null}
-      <path d={g.areaPath} fill={`url(#${gradientId})`} />
-      <path d={g.linePath} fill="none" stroke="var(--doc-brand)" strokeWidth={st.stroke} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={g.end.x} cy={g.end.y} r={st.dot} fill="var(--doc-brand)" stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
-      {g.labels.map((l) => (
-        <g key={l.kind}>
-          <text x={l.x} y={l.valueY} textAnchor={l.anchor} fontSize={st.valueSize} fontWeight={800} fill={st.valueColor} style={{ ...halo, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
-            {l.value}
-          </text>
-          <text x={l.x} y={l.nameY} textAnchor={l.anchor} fontSize={st.nameSize} fill={st.nameColor} style={halo}>
-            {l.name}
-          </text>
-        </g>
-      ))}
-      {g.ticks.map((t) => (
-        <text key={t.label + t.anchor} x={t.x} y={g.baseY + 16} fontSize={st.fontSize} textAnchor={t.anchor} fill={st.label}>
-          {t.label}
-        </text>
-      ))}
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={shown}
+      width={CHART_SIZE.width}
+      height={CHART_SIZE.height}
+      alt={chartAltText(chart, ahead)}
+      draggable={false}
+      className="block h-auto w-full select-none"
+    />
   );
 }
 
@@ -170,9 +141,6 @@ export function MonthlyFiguresPopover({
               />
             </label>
           ))}
-        </div>
-        <div className="rounded-md bg-[#f6f8f7] px-2 pt-2 pb-1">
-          <RevenueChartGraphic chart={draft} narrow />
         </div>
         <div className="flex items-center justify-between">
           {chart ? (

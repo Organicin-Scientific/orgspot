@@ -1,13 +1,11 @@
+import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
-import { CHART_STYLE, CHART_SURFACE, chartGeometry, chartMarksSvg, decodeChart, type ChartAhead } from "@/lib/content/revenue-chart";
-import { verifyToken } from "@/server/tokens";
+import { CHART_STYLE, CHART_SURFACE, chartGeometry, chartMarksSvg, type ChartAhead, type RevenueChart } from "@/lib/content/revenue-chart";
 
 /** Rendered at 2x the display size so the chart stays sharp on high-density screens. */
 const SCALE = 2;
-const HEX = /^#[0-9a-fA-F]{6}$/;
 
 let fonts: Promise<{ name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" }[]> | null = null;
 function loadFonts() {
@@ -21,31 +19,11 @@ function loadFonts() {
   return fonts;
 }
 
-function notFound() {
-  return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
-}
-
 /**
- * The Revenue YTD chart as a static PNG for emails. Mail clients fetch it without a session,
- * so the figures travel in a signed token: this route only draws charts the app itself put
- * in a rendered email. The image for a given token never changes, so it caches forever.
+ * The Revenue YTD chart as a PNG: the one picture of it. The email, the editor and the PDF all
+ * show this image, so what the editor shows is exactly what investors get.
  */
-export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("c") ?? "";
-  // Five fields carry the trajectory's undated segments; three (older emails) are the plain line.
-  const fields = verifyToken("chart", token, 5) ?? verifyToken("chart", token, 3);
-  if (!fields) return notFound();
-  const [year, months, color, contracted, proposed] = fields;
-  const chart = decodeChart(year, months);
-  if (!chart || !HEX.test(color)) return notFound();
-  let ahead: ChartAhead | null = null;
-  if (contracted !== undefined && proposed !== undefined) {
-    const c = Number(contracted);
-    const p = Number(proposed);
-    if (![c, p].every((v) => Number.isFinite(v) && v >= 0 && v <= 1e11)) return notFound();
-    ahead = { contracted: c, proposed: p };
-  }
-
+export async function revenueChartImage(chart: RevenueChart, color: string, ahead: ChartAhead | null, headers: Record<string, string> = {}) {
   const g = chartGeometry(chart, ahead);
   const svg = chartMarksSvg(chart, color, SCALE, ahead);
   const st = CHART_STYLE;
@@ -98,7 +76,12 @@ export async function GET(req: NextRequest) {
       width: g.width * SCALE,
       height: g.height * SCALE,
       fonts: await loadFonts(),
-      headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+      headers,
     },
   );
+}
+
+export async function revenueChartPng(chart: RevenueChart, color: string, ahead: ChartAhead | null): Promise<Buffer> {
+  const res = await revenueChartImage(chart, color, ahead);
+  return Buffer.from(await res.arrayBuffer());
 }

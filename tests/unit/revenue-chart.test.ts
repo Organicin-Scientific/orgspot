@@ -9,8 +9,7 @@ import {
   decodeChart,
   encodeChartMonths,
   formatShortUsd,
-  type RevenueChart,
-} from "@/lib/content/revenue-chart";
+  type RevenueChart, chartPreviewPath } from "@/lib/content/revenue-chart";
 import { parseDoc, type DocNode } from "@/lib/content/schema";
 import {
   metricDisplayValue,
@@ -196,5 +195,13 @@ describe("outlook", () => {
     const g = chartGeometry(chart, { contracted: 121000, proposed: 5000 });
     const [, s, p] = g.labels;
     expect(s!.valueY - p!.nameY).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe("chartPreviewPath", () => {
+  it("carries the figures the editor shows, with the work ahead when there is any", () => {
+    const chart = { year: 2026, months: [14600, 0, 700] };
+    expect(chartPreviewPath(chart, null)).toBe("/api/charts/revenue/preview?y=2026&m=14600%2C0%2C700");
+    expect(chartPreviewPath(chart, { contracted: 121000.4, proposed: 233000 })).toBe("/api/charts/revenue/preview?y=2026&m=14600%2C0%2C700&c=121000&p=233000");
   });
 });
