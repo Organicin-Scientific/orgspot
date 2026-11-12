@@ -126,7 +126,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                 key={i}
                 className="flex items-center justify-between gap-4 border-t border-[#eef1f0] px-5 py-3"
               >
-                <div className="min-w-0 select-none">
+                <div className="min-w-0 flex-1 select-none [overflow-wrap:normal] [word-break:normal]">
                   <p className="flex items-center text-[13px] font-semibold leading-tight text-[#1f2623]">
                     {swatch(it.label) ? <LineSwatch kind={swatch(it.label)!} /> : null}
                     {it.label}
@@ -138,7 +138,8 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                   placeholder="Value"
                   disabled={!editable}
                   align="right"
-                  className="w-[9.5rem] shrink-0 px-1.5 py-0.5 text-[20px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[#1f2623] transition-[background-color,box-shadow] duration-150 ease-out placeholder:text-[13px] placeholder:font-normal focus:bg-white focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--doc-brand)_30%,transparent)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f6f8f7]"
+                  size={Math.max(5, Math.min(14, it.value.length + 1))}
+                  className="w-auto max-w-[11rem] shrink-0 px-1.5 py-0.5 [field-sizing:content] text-[20px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-[#1f2623] transition-[background-color,box-shadow] duration-150 ease-out placeholder:text-[13px] placeholder:font-normal focus:bg-white focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--doc-brand)_30%,transparent)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f6f8f7]"
                   maxLength={40}
                   onChange={(v) => setValue(i, v)}
                   ariaLabel={`${it.label || `Metric ${i + 1}`} value`}
@@ -198,8 +199,10 @@ function MetricInput({
   maxLength,
   ariaLabel,
   align = "center",
+  size,
 }: {
   align?: "left" | "center" | "right";
+  size?: number;
   value: string;
   onChange: (v: string) => void;
   className?: string;
@@ -215,10 +218,13 @@ function MetricInput({
       disabled={disabled}
       maxLength={maxLength}
       aria-label={ariaLabel}
+      size={size}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => e.stopPropagation()}
       className={cn(
-        "block w-full rounded-[6px] bg-transparent outline-none placeholder:text-[#b5b5b5] disabled:cursor-default",
+        "block rounded-[6px]",
+        size ? "" : "w-full",
+        "bg-transparent outline-none placeholder:text-[#b5b5b5] disabled:cursor-default",
         align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center",
         className,
       )}
