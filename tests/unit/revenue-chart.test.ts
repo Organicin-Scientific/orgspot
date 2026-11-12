@@ -173,9 +173,11 @@ describe("outlook", () => {
     // Each line carries its own metric's figure and name; definitions go under the chart.
     expect(g.labels.map((l) => [l.value, l.name])).toEqual([
       ["$183K", "Revenue YTD"],
-      ["$121K", "Contracted backlog"],
-      ["$233K", "Pipeline"],
+      ["+$121K", "Contracted backlog"],
+      ["+$233K", "Pipeline"],
     ]);
+    // The y-axis shows running totals, so each line's height is the sum.
+    expect(g.yTicks.map((t) => t.text)).toEqual(["$200K", "$400K", "$600K"]);
     expect(chartDefinitions(g).map((d) => d.name)).toEqual(["Revenue YTD", "Contracted backlog", "Pipeline"]);
     // Proposed sits above signed, and every label stays inside the drawing.
     const [, s, p] = g.labels;

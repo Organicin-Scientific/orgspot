@@ -114,7 +114,7 @@ export interface ChartTick {
 export interface ChartLabel {
   kind: "received" | "signed" | "proposed";
   x: number;
-  anchor: "start" | "end";
+  anchor: "end";
   /** Baselines of the two lines. */
   valueY: number;
   nameY: number;
@@ -137,6 +137,16 @@ export interface ChartGeometry {
   labels: ChartLabel[];
   /** January at the left, the as-of month where the received line ends. Nothing after it. */
   ticks: ChartTick[];
+  /** Faint gridlines with running-total values: the lines stack, so each height is a sum. */
+  yTicks: { y: number; text: string }[];
+}
+
+/** Round up to a clean step of a power of ten, close enough that the lines fill the plot. */
+function niceMax(v: number): number {
+  if (v <= 0) return 1;
+  const pow = 10 ** Math.floor(Math.log10(v));
+  for (const step of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (step * pow >= v) return step * pow;
+  return 10 * pow;
 }
 
 const f = (n: number) => Number(n.toFixed(2));
@@ -150,6 +160,7 @@ export const CHART_STYLE = {
   dotRing: 2,
   fillOpacity: 0.16,
   baseline: "#e3e8e6",
+  grid: "#eef1f0",
   label: "#8a938f",
   fontSize: 10,
   valueSize: 14,
@@ -194,7 +205,8 @@ export function chartGeometry(
   const narrow = width < 380;
   const split = hasAhead ? (narrow ? 0.4 : 0.52) : 1;
   const timeW = plotW * split;
-  const yMax = Math.max(running, proposed, 1);
+  // A clean top value, split into three gridlines: $200K, $400K, $600K.
+  const yMax = niceMax(Math.max(running, proposed, 1));
   const x = (i: number) => pad.left + (timeW * i) / n;
   const y = (v: number) => pad.top + plotH * (1 - v / yMax);
 
@@ -217,22 +229,18 @@ export function chartGeometry(
   // Each line is labelled with its own metric's figure and name. Labels sit above their line;
   // when two tails are close, they're kept apart.
   const GAP = 34;
-  const label = (kind: ChartLabel["kind"], name: string, lx: number, anchorY: number, value: number, anchor: ChartLabel["anchor"] = "end"): ChartLabel => ({
+  const label = (kind: ChartLabel["kind"], name: string, lx: number, anchorY: number, value: number): ChartLabel => ({
     kind,
     x: f(lx),
-    anchor,
+    anchor: "end",
     valueY: f(anchorY - 20),
     nameY: f(anchorY - 7),
-    value: formatShortUsd(value),
+    // Backlog and pipeline stack on what's received, so their figures read as additions.
+    value: (kind === "received" ? "" : "+") + formatShortUsd(value),
     name,
   });
-  // Revenue YTD sits over the received line: ending at its last point, or, in a narrow drawing
-  // with work ahead, starting from the left edge where there's room for its definition.
-  const receivedLabel =
-    hasAhead && narrow
-      ? label("received", REVENUE_YTD_LABEL, pad.left, last.y - 8, received, "start")
-      : label("received", REVENUE_YTD_LABEL, hasAhead ? last.x - 8 : xEnd, last.y - (hasAhead ? 4 : 8), received);
-  const labels: ChartLabel[] = [receivedLabel];
+  // Revenue YTD sits just above where the received line ends.
+  const labels: ChartLabel[] = [label("received", REVENUE_YTD_LABEL, hasAhead ? last.x - 8 : xEnd, last.y - (hasAhead ? 4 : 8), received)];
   const signedY = y(signed);
   const proposedY = proposedPath ? Math.max(32, signedPath ? Math.min(y(proposed), signedY - GAP) : y(proposed)) : 0;
   // If the tails are too close to stack both labels above, the backlog label drops below its line.
@@ -245,7 +253,9 @@ export function chartGeometry(
     : { x: f(xEnd), label: MONTH_SHORT[n - 1]!, anchor: "end" };
   const ticks: ChartTick[] = n === 1 ? [monthTick] : [{ x: f(pad.left), label: MONTH_SHORT[0]!, anchor: "start" }, monthTick];
 
-  return { width, height, baseY: f(baseY), linePath, areaPath, end: { x: f(last.x), y: f(last.y) }, signedPath, proposedPath, labels, ticks };
+  const yTicks = [1, 2, 3].map((i) => ({ y: f(y((yMax * i) / 3)), text: formatShortUsd((yMax * i) / 3) }));
+
+  return { width, height, baseY: f(baseY), linePath, areaPath, end: { x: f(last.x), y: f(last.y) }, signedPath, proposedPath, labels, ticks, yTicks };
 }
 
 /** The metric card's background. The end dot's ring matches it so the dot reads as cut out of the line. */
@@ -281,6 +291,7 @@ export function chartMarksSvg(chart: RevenueChart, color: string, scale = 1, ahe
     `<stop offset="0" stop-color="${color}" stop-opacity="${s.fillOpacity}"/>`,
     `<stop offset="1" stop-color="${color}" stop-opacity="0"/>`,
     `</linearGradient></defs>`,
+    ...g.yTicks.map((t) => `<line x1="0" y1="${t.y}" x2="${g.width}" y2="${t.y}" stroke="${s.grid}" stroke-width="1"/>`),
     `<line x1="0" y1="${g.baseY}" x2="${g.width}" y2="${g.baseY}" stroke="${s.baseline}" stroke-width="1"/>`,
     g.proposedPath
       ? `<path d="${g.proposedPath}" fill="none" stroke="${color}" stroke-opacity="${s.proposedOpacity}" stroke-width="${s.stroke}" stroke-dasharray="${s.dashProposed}" stroke-linecap="round"/>`
