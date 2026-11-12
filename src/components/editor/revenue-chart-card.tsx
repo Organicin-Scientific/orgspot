@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PROMPT_OPEN } from "@/lib/content/template";
 import {
   CHART_SIZE,
-  CHART_STYLE,
   chartAltText,
   chartPreviewPath,
   type ChartAhead,
@@ -55,11 +55,14 @@ export function MonthlyFiguresPopover({
   disabled,
   onSave,
   onClear,
+  extras = [],
 }: {
   chart: RevenueChart | undefined;
   disabled: boolean;
-  onSave: (chart: RevenueChart) => void;
+  onSave: (chart: RevenueChart, extraValues: string[]) => void;
   onClear: () => void;
+  /** Other figures the chart draws (backlog, pipeline), edited here once the chart replaces their rows. */
+  extras?: { label: string; value: string }[];
 }) {
   const now = new Date();
   const [open, setOpen] = useState(false);
@@ -69,6 +72,8 @@ export function MonthlyFiguresPopover({
     MONTH_SHORT.map((_, i) => (chart && i < chart.months.length ? String(chart.months[i]) : "")),
   );
 
+  const typed = (v: string) => (v.includes(PROMPT_OPEN) ? "" : v);
+  const [extraValues, setExtraValues] = useState<string[]>(() => extras.map((e) => typed(e.value)));
   const draft: RevenueChart = useMemo(
     () => ({ year, months: values.slice(0, through).map(parseDollars) }),
     [year, values, through],
@@ -78,6 +83,7 @@ export function MonthlyFiguresPopover({
     setYear(chart?.year ?? now.getFullYear());
     setThrough(chart?.months.length ?? Math.max(1, now.getMonth()));
     setValues(MONTH_SHORT.map((_, i) => (chart && i < chart.months.length ? String(chart.months[i]) : "")));
+    setExtraValues(extras.map((e) => typed(e.value)));
   };
 
   return (
@@ -93,7 +99,7 @@ export function MonthlyFiguresPopover({
           type="button"
           className="pressable mt-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-sans text-xs text-[#5b6561] disabled:hidden [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eef1f0]"
         >
-          <LineChart className="size-3" /> {chart ? "Edit monthly figures" : "Enter monthly figures"}
+          <LineChart className="size-3" /> {extras.length ? "Edit figures" : chart ? "Edit monthly figures" : "Enter monthly figures"}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 font-sans" align="center" onKeyDown={(e) => e.stopPropagation()}>
@@ -142,6 +148,22 @@ export function MonthlyFiguresPopover({
             </label>
           ))}
         </div>
+        {extras.length ? (
+          <div className="grid gap-1.5 border-t border-border pt-2">
+            {extras.map((e, i) => (
+              <label key={e.label} className="flex items-center justify-between gap-2 text-xs">
+                {e.label}
+                <input
+                  value={extraValues[i]}
+                  placeholder="$0"
+                  maxLength={40}
+                  onChange={(ev) => setExtraValues((v) => v.map((x, j) => (j === i ? ev.target.value : x)))}
+                  className="w-28 rounded border border-input bg-transparent px-1.5 py-1 text-right text-sm text-foreground tabular-nums"
+                />
+              </label>
+            ))}
+          </div>
+        ) : null}
         <div className="flex items-center justify-between">
           {chart ? (
             <button
@@ -161,7 +183,7 @@ export function MonthlyFiguresPopover({
             type="button"
             className="pressable rounded-md bg-[var(--doc-brand)] px-3 py-1.5 text-xs font-semibold text-white"
             onClick={() => {
-              onSave(draft);
+              onSave(draft, extraValues);
               setOpen(false);
             }}
           >
@@ -170,24 +192,5 @@ export function MonthlyFiguresPopover({
         </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-/** A short line sample beside a row label: which line on the chart the figure draws. */
-export function LineSwatch({ kind }: { kind: "signed" | "proposed" }) {
-  return (
-    <svg width="16" height="6" viewBox="0 0 16 6" aria-hidden="true" className="mr-1.5 inline-block shrink-0 align-middle">
-      <line
-        x1="1"
-        y1="3"
-        x2="15"
-        y2="3"
-        stroke="var(--doc-brand)"
-        strokeOpacity={kind === "proposed" ? CHART_STYLE.proposedOpacity : 1}
-        strokeWidth={2}
-        strokeDasharray={kind === "signed" ? CHART_STYLE.dashSigned : CHART_STYLE.dashProposed}
-        strokeLinecap={kind === "proposed" ? "round" : "butt"}
-      />
-    </svg>
   );
 }

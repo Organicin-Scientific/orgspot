@@ -11,9 +11,9 @@ import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewP
 import StarterKit from "@tiptap/starter-kit";
 import { RotateCcw } from "lucide-react";
 import { CALLOUT_TONES, isSafeHref, type CalloutTone, type MetricItem } from "@/lib/content/schema";
-import { chartAheadFrom, chartDefinitions, chartGeometry, chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, PIPELINE_LABEL, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
+import { chartAheadFrom, chartDefinitions, chartGeometry, chartTotal, formatShortUsd, hasChartData, REVENUE_YTD_LABEL, type RevenueChart } from "@/lib/content/revenue-chart";
 import { isStandingMetrics, METRIC_PROMPTS, PROMPT_OPEN, standingPromptItems } from "@/lib/content/template";
-import { LineSwatch, MonthlyFiguresPopover, RevenueChartImage } from "./revenue-chart-card";
+import { MonthlyFiguresPopover, RevenueChartImage } from "./revenue-chart-card";
 import { cn } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -49,15 +49,25 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
         return { ...it, chart, value: formatShortUsd(chartTotal(chart)) };
       }),
     });
-  // With monthly figures, Revenue YTD becomes the Outlook chart and carries every figure; the
-  // rows below stay so the author can edit backlog and pipeline. Without monthly figures, it's
-  // a ledger card: the first figure leading, the rest as rows.
+  // Saving the figures popover with the chart showing: monthly figures plus backlog and pipeline.
+  // A blank figure goes back to its prompt, which blocks investor sends like any other.
+  const saveFigures = (chart: RevenueChart, extraValues: string[]) => {
+    let k = 0;
+    updateAttributes({
+      items: items.map((it, j) => {
+        if (j === heroIndex) return { ...it, chart, value: formatShortUsd(chartTotal(chart)) };
+        const v = extraValues[k++]?.trim() ?? "";
+        return { ...it, value: v || (it.value.includes(PROMPT_OPEN) ? it.value : `${PROMPT_OPEN}${METRIC_PROMPTS[j] ?? "value"}]`) };
+      }),
+    });
+  };
+  // With monthly figures, Revenue YTD becomes the Outlook chart and carries every figure, as in
+  // the email and the PDF; backlog and pipeline are edited in the figures popover. Without
+  // monthly figures, it's a ledger card: the first figure leading, the rest as rows.
   const heroIndex = Math.max(0, items.findIndex((it) => it.label === REVENUE_YTD_LABEL));
   const hero = items[heroIndex];
   const charted = hero?.label === REVENUE_YTD_LABEL && hasChartData(hero.chart) ? hero.chart : null;
   const ahead = charted ? chartAheadFrom(items) : null;
-  const swatch = (label: string): "signed" | "proposed" | null =>
-    !ahead ? null : label === CONTRACTED_LABEL && ahead.contracted > 0 ? "signed" : label === PIPELINE_LABEL && ahead.proposed > 0 ? "proposed" : null;
 
   // Labels and basis lines are fixed (see STANDING_METRICS) so the strip stays comparable
   // quarter to quarter. Only values are editable here.
@@ -76,7 +86,8 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
                   key={JSON.stringify(charted)}
                   chart={charted}
                   disabled={!editable}
-                  onSave={(chart) => setChart(heroIndex, chart)}
+                  extras={items.filter((_, j) => j !== heroIndex).map((it) => ({ label: it.label, value: it.value }))}
+                  onSave={saveFigures}
                   onClear={() => setChart(heroIndex, undefined)}
                 />
               </div>
@@ -123,14 +134,13 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
             </div>
           )}
           {items.map((it, i) =>
-            i === heroIndex ? null : (
+            i === heroIndex || charted ? null : (
               <div
                 key={i}
                 className="flex items-center justify-between gap-4 border-t border-[#eef1f0] px-5 py-3"
               >
                 <div className="min-w-0 flex-1 select-none [overflow-wrap:normal] [word-break:normal]">
                   <p className="flex items-center text-[13px] font-semibold leading-tight text-[#1f2623]">
-                    {swatch(it.label) ? <LineSwatch kind={swatch(it.label)!} /> : null}
                     {it.label}
                   </p>
                   {it.sublabel ? <p className="mt-0.5 text-[12px] leading-tight text-[#8a938f]">{it.sublabel}</p> : null}
