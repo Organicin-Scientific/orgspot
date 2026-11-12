@@ -123,12 +123,7 @@ function OutlookCard({ chart, ahead, ctx }: { chart: RevenueChart; ahead: ChartA
     >
       <tbody>
         <tr>
-          <td style={{ padding: "16px 20px 0" }}>
-            <p style={textStyle(ctx.m, { margin: "0", fontSize: "12px", lineHeight: "16px", fontWeight: 600, color: METRIC_LABEL })}>{REVENUE_YTD_LABEL}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style={{ padding: "4px 12px 0" }}>
+          <td style={{ padding: "14px 12px 0" }}>
             <Img
               src={ctx.m.chartUrl(chart, ahead)}
               alt={chartAltText(chart, ahead)}

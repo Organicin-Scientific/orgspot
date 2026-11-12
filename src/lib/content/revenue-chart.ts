@@ -29,6 +29,13 @@ export const REVENUE_YTD_LABEL = "Revenue YTD";
 export const CONTRACTED_LABEL = "Contracted backlog";
 export const PIPELINE_LABEL = "Pipeline";
 
+/** The standing definitions shown under each metric's name, on the strip and on the chart. */
+export const METRIC_DEFINITIONS = {
+  [REVENUE_YTD_LABEL]: "cash received since Jan 1",
+  [CONTRACTED_LABEL]: "signed, not yet collected",
+  [PIPELINE_LABEL]: "proposed, not yet signed",
+} as const;
+
 /** "$121K" → 121000, "$1.2M" → 1200000, "$800K+" → 800000. A prompt or junk reads as 0. */
 export function parseShortUsd(text: string | undefined): number {
   if (!text || text.includes("[Write:")) return 0;
@@ -79,10 +86,10 @@ export function chartAltText(chart: RevenueChart, ahead: ChartAhead | null = nul
   const signedAdd = toK(ahead.contracted);
   const proposedAdd = toK(ahead.proposed);
   const parts = [
-    signedAdd > 0 ? `${formatShortUsd(received + signedAdd)} with ${formatShortUsd(signedAdd)} of signed work not yet collected (dashed line).` : "",
-    proposedAdd > 0 ? `${formatShortUsd(received + signedAdd + proposedAdd)} with ${formatShortUsd(proposedAdd)} of proposals not yet signed (dotted line).` : "",
+    signedAdd > 0 ? `Contracted backlog: ${formatShortUsd(signedAdd)}, signed, not yet collected (dashed line).` : "",
+    proposedAdd > 0 ? `Pipeline: ${formatShortUsd(proposedAdd)}, proposed, not yet signed (dotted line).` : "",
   ].filter(Boolean);
-  return parts.length ? `${base} ${parts.join(" ")} The signed and proposed work has no dates.` : base;
+  return parts.length ? `${base} ${parts.join(" ")} Both continue the line without dates.` : base;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,14 +110,17 @@ export interface ChartTick {
   anchor: "start" | "middle" | "end";
 }
 
-/** A direct label: a bold figure above a short line of text, right-aligned to x. */
+/** A direct label: the metric's figure, its name, and its definition, aligned to x. */
 export interface ChartLabel {
   kind: "received" | "signed" | "proposed";
   x: number;
-  /** Baselines of the figure and the line under it. */
+  anchor: "start" | "end";
+  /** Baselines of the three lines. */
   valueY: number;
+  nameY: number;
   subY: number;
   value: string;
+  name: string;
   sub: string;
 }
 
@@ -145,9 +155,10 @@ export const CHART_STYLE = {
   label: "#8a938f",
   fontSize: 11,
   valueSize: 16,
-  subSize: 12.5,
+  nameSize: 12.5,
+  subSize: 11.5,
   valueColor: "#1f2623",
-  subColor: "#5b6561",
+  subColor: "#8a938f",
   dashSigned: "7 5",
   dashProposed: "0.5 5",
   /** Proposals are the least certain money, so their line sits back a little. */
@@ -161,7 +172,7 @@ export function chartGeometry(
 ): ChartGeometry {
   const { width, height } = size;
   // Top padding holds the highest label; there is no y-axis, every figure is labelled.
-  const pad = { top: 44, right: 8, bottom: 24, left: 6 };
+  const pad = { top: 58, right: 8, bottom: 24, left: 6 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const baseY = pad.top + plotH;
@@ -181,8 +192,10 @@ export function chartGeometry(
   const proposed = signed + proposedAdd;
   const hasAhead = signedAdd > 0 || proposedAdd > 0;
 
-  // With work ahead, time takes the left half and stops at the as-of month.
-  const split = hasAhead ? (width < 380 ? 0.46 : 0.52) : 1;
+  // With work ahead, time takes the left part and stops at the as-of month. Narrow drawings
+  // give the right more room so the rising lines clear the labels at the edge.
+  const narrow = width < 380;
+  const split = hasAhead ? (narrow ? 0.4 : 0.52) : 1;
   const timeW = plotW * split;
   const yMax = Math.max(running, proposed, 1);
   const x = (i: number) => pad.left + (timeW * i) / n;
@@ -201,25 +214,36 @@ export function chartGeometry(
     const k = (xr - last.x) / 2;
     return `M${f(last.x)} ${f(last.y)} C${f(last.x + k)} ${f(last.y)} ${f(xr - k)} ${f(yr)} ${f(xr)} ${f(yr)} L${f(xEnd)} ${f(yr)}`;
   };
-  const signedPath = signedAdd > 0 ? fan(signed, 0.18) : null;
-  const proposedPath = proposedAdd > 0 ? fan(proposed, 0.27) : null;
+  const signedPath = signedAdd > 0 ? fan(signed, narrow ? 0.11 : 0.18) : null;
+  const proposedPath = proposedAdd > 0 ? fan(proposed, narrow ? 0.16 : 0.27) : null;
 
-  // Labels sit above their line. When two tails are close, the upper label moves up to clear.
-  const label = (kind: ChartLabel["kind"], lx: number, anchorY: number, value: number, sub: string): ChartLabel => ({
+  // Each line is labelled with its own metric: the figure, the name, the definition. Labels
+  // sit above their line; when two tails are close, they're kept apart.
+  const GAP = 54;
+  const label = (kind: ChartLabel["kind"], name: string, lx: number, anchorY: number, value: number, anchor: ChartLabel["anchor"] = "end"): ChartLabel => ({
     kind,
     x: f(lx),
-    valueY: f(anchorY - 24),
-    subY: f(anchorY - 9),
+    anchor,
+    valueY: f(anchorY - 38),
+    nameY: f(anchorY - 22),
+    subY: f(anchorY - 8),
     value: formatShortUsd(value),
-    sub,
+    name,
+    sub: METRIC_DEFINITIONS[name as keyof typeof METRIC_DEFINITIONS],
   });
-  const labels: ChartLabel[] = [label("received", hasAhead ? last.x - 8 : xEnd, last.y - (hasAhead ? 4 : 8), received, "received")];
+  // Revenue YTD sits over the received line: ending at its last point, or, in a narrow drawing
+  // with work ahead, starting from the left edge where there's room for its definition.
+  const receivedLabel =
+    hasAhead && narrow
+      ? label("received", REVENUE_YTD_LABEL, pad.left, last.y - 8, received, "start")
+      : label("received", REVENUE_YTD_LABEL, hasAhead ? last.x - 8 : xEnd, last.y - (hasAhead ? 4 : 8), received);
+  const labels: ChartLabel[] = [receivedLabel];
   const signedY = y(signed);
-  const proposedY = proposedPath ? Math.max(36, signedPath ? Math.min(y(proposed), signedY - 40) : y(proposed)) : 0;
-  // If the tails are too close to stack both labels above, signed's label drops below its line.
-  const signedBelow = Boolean(proposedPath && signedPath && signedY - proposedY < 40);
-  if (signedPath) labels.push(label("signed", xEnd, signedBelow ? signedY + 34 : signedY, signed, `+${formatShortUsd(signedAdd)} signed`));
-  if (proposedPath) labels.push(label("proposed", xEnd, proposedY, proposed, `+${formatShortUsd(proposedAdd)} proposed`));
+  const proposedY = proposedPath ? Math.max(50, signedPath ? Math.min(y(proposed), signedY - GAP) : y(proposed)) : 0;
+  // If the tails are too close to stack both labels above, the backlog label drops below its line.
+  const signedBelow = Boolean(proposedPath && signedPath && signedY - proposedY < GAP);
+  if (signedPath) labels.push(label("signed", CONTRACTED_LABEL, xEnd, signedBelow ? signedY + 48 : signedY, signedAdd));
+  if (proposedPath) labels.push(label("proposed", PIPELINE_LABEL, xEnd, proposedY, proposedAdd));
 
   const monthTick: ChartTick = hasAhead
     ? { x: f(last.x), label: MONTH_SHORT[n - 1]!, anchor: "middle" }
@@ -233,7 +257,7 @@ export function chartGeometry(
 export const CHART_SURFACE = "#ffffff";
 
 /** One line under the chart for every renderer. */
-export const CHART_FOOTNOTE = "Signed and proposed work is shown without dates.";
+export const CHART_FOOTNOTE = "Contracted backlog and pipeline are shown without dates.";
 
 /**
  * The chart's marks as an SVG string, with no text: the email image draws its labels with the

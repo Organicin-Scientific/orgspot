@@ -144,8 +144,12 @@ function PdfRevenueChart({ chart, ctx, ahead }: { chart: RevenueChart; ctx: Ctx;
         <Circle cx={g.end.x} cy={g.end.y} r={st.dot} fill={ctx.color} stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
       </Svg>
       {g.labels.map((l) => (
-        <View key={l.kind} style={{ ...abs, right: (g.width - l.x) * k, top: top(l.valueY, st.valueSize), alignItems: "flex-end" }}>
+        <View
+          key={l.kind}
+          style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * k } : { left: l.x * k }), top: top(l.valueY, st.valueSize), alignItems: l.anchor === "end" ? "flex-end" : "flex-start" }}
+        >
           <Text style={{ fontSize: st.valueSize * k * 0.75, lineHeight: 1.05, fontFamily: ctx.f.bold, color: st.valueColor }}>{l.value}</Text>
+          <Text style={{ fontSize: st.nameSize * k * 0.75, lineHeight: 1.1, fontFamily: ctx.f.bold, color: st.valueColor, marginTop: 1 }}>{l.name}</Text>
           <Text style={{ fontSize: st.subSize * k * 0.75, lineHeight: 1.1, color: st.subColor, marginTop: 1 }}>{l.sub}</Text>
         </View>
       ))}
@@ -310,7 +314,6 @@ function Block({ node, ctx, tight }: { node: BlockNode; ctx: Ctx; tight?: boolea
         const ahead = chartAheadFrom(items);
         return (
           <View style={{ ...card, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 10 }} wrap={false}>
-            <Text style={{ fontSize: 8, fontFamily: ctx.f.bold, color: "#5b6561" }}>{REVENUE_YTD_LABEL}</Text>
             <PdfRevenueChart chart={hero.chart} ctx={ctx} ahead={ahead} />
             {ahead ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 2 }}>{CHART_FOOTNOTE}</Text> : null}
           </View>

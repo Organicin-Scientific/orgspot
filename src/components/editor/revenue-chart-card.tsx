@@ -44,10 +44,13 @@ export function RevenueChartGraphic({ chart, ahead = null, narrow = false }: { c
       <circle cx={g.end.x} cy={g.end.y} r={st.dot} fill="var(--doc-brand)" stroke={CHART_SURFACE} strokeWidth={st.dotRing} />
       {g.labels.map((l) => (
         <g key={l.kind}>
-          <text x={l.x} y={l.valueY} textAnchor="end" fontSize={st.valueSize} fontWeight={800} fill={st.valueColor} style={{ ...halo, fontVariantNumeric: "tabular-nums" }}>
+          <text x={l.x} y={l.valueY} textAnchor={l.anchor} fontSize={st.valueSize} fontWeight={800} fill={st.valueColor} style={{ ...halo, fontVariantNumeric: "tabular-nums" }}>
             {l.value}
           </text>
-          <text x={l.x} y={l.subY} textAnchor="end" fontSize={st.subSize} fill={st.subColor} style={halo}>
+          <text x={l.x} y={l.nameY} textAnchor={l.anchor} fontSize={st.nameSize} fontWeight={700} fill={st.valueColor} style={halo}>
+            {l.name}
+          </text>
+          <text x={l.x} y={l.subY} textAnchor={l.anchor} fontSize={st.subSize} fill={st.subColor} style={halo}>
             {l.sub}
           </text>
         </g>

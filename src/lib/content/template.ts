@@ -1,4 +1,4 @@
-import { chartTotal, formatShortUsd, hasChartData, REVENUE_YTD_LABEL } from "./revenue-chart";
+import { chartTotal, CONTRACTED_LABEL, formatShortUsd, hasChartData, METRIC_DEFINITIONS, PIPELINE_LABEL, REVENUE_YTD_LABEL } from "./revenue-chart";
 import type { BlockNode, DocNode, MetricItem } from "./schema";
 
 /**
@@ -45,9 +45,9 @@ export const WHAT_WE_DO =
  * Pipeline to Contracted backlog when a contract is signed, then to Revenue YTD when cash arrives.
  */
 export const STANDING_METRICS: readonly { label: string; sublabel: string }[] = [
-  { label: "Revenue YTD", sublabel: "cash received since Jan 1" },
-  { label: "Contracted backlog", sublabel: "signed, not yet collected" },
-  { label: "Pipeline", sublabel: "proposed, not yet signed" },
+  { label: REVENUE_YTD_LABEL, sublabel: METRIC_DEFINITIONS[REVENUE_YTD_LABEL] },
+  { label: CONTRACTED_LABEL, sublabel: METRIC_DEFINITIONS[CONTRACTED_LABEL] },
+  { label: PIPELINE_LABEL, sublabel: METRIC_DEFINITIONS[PIPELINE_LABEL] },
 ];
 
 /** True when a strip carries exactly the standing labels, in order. */

@@ -71,8 +71,7 @@ function MetricsView({ node, updateAttributes, editor, selected }: NodeViewProps
         <div className="@container overflow-hidden rounded-[12px] border border-[#e3e8e6] bg-white">
           {charted ? (
             <div className="px-3 pt-4 pb-3">
-              <div className="flex items-center justify-between gap-3 px-2">
-                <p className="select-none text-[12px] font-medium tracking-[0.01em] text-[#5b6561]">{REVENUE_YTD_LABEL}</p>
+              <div className="flex items-center justify-end gap-3 px-2">
                 <MonthlyFiguresPopover
                   key={JSON.stringify(charted)}
                   chart={charted}

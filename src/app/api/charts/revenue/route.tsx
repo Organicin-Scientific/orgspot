@@ -59,10 +59,13 @@ export async function GET(req: NextRequest) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} width={g.width * SCALE} height={g.height * SCALE} alt="" style={{ position: "absolute", left: 0, top: 0 }} />
         {g.labels.flatMap((l) => [
-          <div key={l.kind + "v"} style={{ ...abs, right: (g.width - l.x) * SCALE, top: top(l.valueY, st.valueSize), fontSize: st.valueSize * SCALE, fontWeight: 700, color: st.valueColor }}>
+          <div key={l.kind + "v"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.valueY, st.valueSize), fontSize: st.valueSize * SCALE, fontWeight: 700, color: st.valueColor }}>
             {l.value}
           </div>,
-          <div key={l.kind + "s"} style={{ ...abs, right: (g.width - l.x) * SCALE, top: top(l.subY, st.subSize), fontSize: st.subSize * SCALE, color: st.subColor }}>
+          <div key={l.kind + "n"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.nameY, st.nameSize), fontSize: st.nameSize * SCALE, fontWeight: 700, color: st.valueColor }}>
+            {l.name}
+          </div>,
+          <div key={l.kind + "s"} style={{ ...abs, ...(l.anchor === "end" ? { right: (g.width - l.x) * SCALE } : { left: l.x * SCALE }), top: top(l.subY, st.subSize), fontSize: st.subSize * SCALE, color: st.subColor }}>
             {l.sub}
           </div>,
         ])}
